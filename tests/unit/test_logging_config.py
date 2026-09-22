@@ -28,14 +28,14 @@ def _record(
 
 
 def test_json_formatter_emits_cloud_logging_fields_and_extras() -> None:
-    line = JsonFormatter().format(_record("hello", extra={"plate_mask": "****5678", "count": 2}))
+    extra = {"plate_mask": "****5678", "count": 2}
+    line = JsonFormatter().format(_record("hello", extra=extra))
 
     payload = json.loads(line)
     assert payload["severity"] == "INFO"
     assert payload["message"] == "hello"
     assert payload["logger"] == "tests.logging_config"
-    assert payload["plate_mask"] == "****5678"
-    assert payload["count"] == 2
+    assert {key: payload[key] for key in extra} == extra
     assert payload["time"].endswith("+00:00")
 
 

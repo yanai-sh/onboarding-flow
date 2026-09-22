@@ -1,4 +1,5 @@
 import json
+from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -150,7 +151,7 @@ async def test_encore_upstream_warns_on_5xx_with_status_code(
 
     [warning] = _failure_warnings(json_logs)
     assert warning["kind"] == "unavailable"
-    assert warning["status_code"] == 503
+    assert warning["status_code"] == HTTPStatus.SERVICE_UNAVAILABLE
     assert "exception" not in warning
 
 
@@ -164,7 +165,7 @@ async def test_encore_upstream_warns_on_malformed_json(
     _assert_upstream_failure(outcome, UpstreamFailureKind.INVALID_RESPONSE)
     [warning] = _failure_warnings(json_logs)
     assert warning["kind"] == "invalid_response"
-    assert warning["status_code"] == 200
+    assert warning["status_code"] == HTTPStatus.OK
 
 
 @pytest.mark.asyncio

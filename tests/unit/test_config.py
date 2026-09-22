@@ -13,6 +13,9 @@ from onboarding_flow.config import (
     upstream_url,
 )
 
+CUSTOM_TIMEOUT_SECONDS = 2.5
+INTEGER_TIMEOUT_SECONDS = 3  # env strings without a decimal point must still parse as float
+
 
 @pytest.fixture(autouse=True)
 def _clear_settings_cache() -> Iterator[None]:
@@ -29,12 +32,12 @@ def test_settings_defaults() -> None:
 
 def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("UPSTREAM_URL", "https://example.test/vehicle-info")
-    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", "2.5")
+    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", str(CUSTOM_TIMEOUT_SECONDS))
     reset_settings_cache()
 
     settings = get_settings()
     assert str(settings.upstream_url) == "https://example.test/vehicle-info"
-    assert settings.upstream_timeout_seconds == 2.5
+    assert settings.upstream_timeout_seconds == CUSTOM_TIMEOUT_SECONDS
 
 
 def test_settings_rejects_invalid_upstream_url(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,8 +64,8 @@ def test_settings_rejects_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> 
 def test_legacy_config_helpers_use_cached_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", "3")
+    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", str(INTEGER_TIMEOUT_SECONDS))
     reset_settings_cache()
 
     assert upstream_url() == DEFAULT_UPSTREAM_URL
-    assert upstream_timeout_seconds() == 3.0
+    assert upstream_timeout_seconds() == float(INTEGER_TIMEOUT_SECONDS)

@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Any
 
 from litestar.testing import TestClient
@@ -14,7 +15,7 @@ def _property_names(component_schema: dict[str, Any]) -> set[str]:
 
 def test_openapi_schema_lists_vehicle_info(api_client: TestClient) -> None:
     response = api_client.get("/schema/openapi.json")
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     schema = response.json()
     assert schema["info"]["title"] == "Onboarding Flow Vehicle Proxy"
     paths = schema["paths"]
@@ -26,7 +27,7 @@ def test_openapi_schema_lists_vehicle_info(api_client: TestClient) -> None:
 
 def test_openapi_vehicle_models_match_pydantic_contract(api_client: TestClient) -> None:
     response = api_client.get("/schema/openapi.json")
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     schema = response.json()
     components = schema["components"]
     assert isinstance(components, dict)

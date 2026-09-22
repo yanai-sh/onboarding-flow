@@ -3,6 +3,7 @@
 import json
 import subprocess
 import time
+from http import HTTPStatus
 
 import httpx
 import pytest
@@ -37,7 +38,7 @@ def test_container_serves_health_on_port_8080(built_image: str) -> None:
         while time.monotonic() < deadline:
             try:
                 response = httpx.get(health_url, timeout=2)
-                if response.status_code == 200 and response.json() == {"status": "ok"}:
+                if response.status_code == HTTPStatus.OK and response.json() == {"status": "ok"}:
                     return
             except (httpx.HTTPError, json.JSONDecodeError, TypeError, ValueError) as exc:
                 last_error = exc

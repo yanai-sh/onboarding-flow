@@ -2,8 +2,10 @@
 
 import logging
 import time
-from typing import TYPE_CHECKING, override
+from http import HTTPStatus
+from typing import override
 
+from litestar import Request
 from litestar.enums import ScopeType
 from litestar.exceptions import HTTPException
 from litestar.middleware.base import ASGIMiddleware
@@ -13,10 +15,9 @@ from onboarding_flow.logging_config import TRACE_ID
 from onboarding_flow.schemas import LicensePlate, TraceId, parse_trace_id
 from onboarding_flow.state import trace_id_from_state
 
-if TYPE_CHECKING:
-    from litestar import Request
-
 TRACE_HEADER = "X-Trace-ID"
+# Trailing characters left visible by ``mask_plate``; enough to correlate, too few to identify.
+PLATE_MASK_VISIBLE_CHARS = 4
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,10 @@ def elapsed_ms(started: float) -> float:
 
 def mask_plate(license_plate: LicensePlate) -> str:
     """Return a deterministic partial mask; never log the full plate."""
-    if len(license_plate) <= 4:
-        return "****"
-    return f"{'*' * (len(license_plate) - 4)}{license_plate[-4:]}"
+    if len(license_plate) <= PLATE_MASK_VISIBLE_CHARS:
+        return "*" * PLATE_MASK_VISIBLE_CHARS
+    hidden = len(license_plate) - PLATE_MASK_VISIBLE_CHARS
+    return f"{'*' * hidden}{license_plate[-PLATE_MASK_VISIBLE_CHARS:]}"
 
 
 class TraceMiddleware(ASGIMiddleware):
@@ -47,8 +49,6 @@ class TraceMiddleware(ASGIMiddleware):
         if scope["type"] != ScopeType.HTTP:
             await next_app(scope, receive, send)
             return
-
-        from litestar import Request
 
         request = Request(scope=scope, receive=receive)
         trace_id = parse_trace_id(request.headers.get(TRACE_HEADER))
@@ -80,7 +80,7 @@ async def log_unhandled_exception(exc: Exception, scope: Scope) -> None:
 
     Client errors (4xx, including validation) are expected traffic and stay silent.
     """
-    if isinstance(exc, HTTPException) and exc.status_code < 500:
+    if isinstance(exc, HTTPException) and exc.status_code < HTTPStatus.INTERNAL_SERVER_ERROR:
         return
     logger.error(
         "request_failed",

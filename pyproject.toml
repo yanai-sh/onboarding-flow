@@ -48,7 +48,7 @@ extend-exclude = [".agents"]
 select = [
     # Correctness and style baseline
     "E", "W", "F", "I", "UP", "B", "SIM", "RUF", "N", "C4", "PIE", "RET", "RSE", "PERF", "FURB",
-    "PLE", "PLW", "PTH", "DTZ", "ERA", "T20", "PGH",
+    "PLE", "PLW", "PLC0415", "PLR2004", "PTH", "DTZ", "ERA", "T20", "PGH", "ANN001",
     # Exceptions and logging: messages state the rule, never the value (PII in stack traces),
     # log calls pass fields via extra= rather than interpolating them into the message
     "EM", "TRY", "BLE", "LOG", "G",

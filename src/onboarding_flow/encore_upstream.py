@@ -3,6 +3,7 @@
 import json
 import logging
 import time
+from http import HTTPStatus
 
 import httpx
 from pydantic import HttpUrl, ValidationError
@@ -45,12 +46,16 @@ def _outcome_from_upstream_body(body: object, started: float) -> UpstreamOutcome
             try:
                 vehicle = VehicleData.model_validate(data)
             except ValidationError:
-                return _log_failure(UpstreamFailureKind.INVALID_RESPONSE, started, status_code=200)
+                return _log_failure(
+                    UpstreamFailureKind.INVALID_RESPONSE, started, status_code=HTTPStatus.OK
+                )
             return UpstreamSuccess(vehicle=vehicle)
         case {"success": False}:
             return UpstreamFailure(kind=UpstreamFailureKind.NOT_FOUND)
         case _:
-            return _log_failure(UpstreamFailureKind.INVALID_RESPONSE, started, status_code=200)
+            return _log_failure(
+                UpstreamFailureKind.INVALID_RESPONSE, started, status_code=HTTPStatus.OK
+            )
 
 
 class EncoreUpstream:
@@ -79,16 +84,16 @@ class EncoreUpstream:
             return _log_failure(UpstreamFailureKind.UNAVAILABLE, started, exc=exc)
 
         match response.status_code:
-            case 404:
+            case HTTPStatus.NOT_FOUND:
                 return UpstreamFailure(kind=UpstreamFailureKind.NOT_FOUND)
-            case code if code >= 500:
+            case code if code >= HTTPStatus.INTERNAL_SERVER_ERROR:
                 return _log_failure(UpstreamFailureKind.UNAVAILABLE, started, status_code=code)
-            case 200:
+            case HTTPStatus.OK:
                 try:
                     body = response.json()
                 except json.JSONDecodeError, ValueError:
                     return _log_failure(
-                        UpstreamFailureKind.INVALID_RESPONSE, started, status_code=200
+                        UpstreamFailureKind.INVALID_RESPONSE, started, status_code=HTTPStatus.OK
                     )
                 return _outcome_from_upstream_body(body, started)
             case code:

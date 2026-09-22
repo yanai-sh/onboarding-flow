@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from http import HTTPStatus
 from typing import Any
 
 from litestar.testing import TestClient
@@ -8,13 +9,13 @@ from litestar.testing import TestClient
 from onboarding_flow.app import create_app
 from onboarding_flow.envelope import ErrorCode
 from onboarding_flow.memory_upstream import MemoryUpstream, failure_upstream
-from onboarding_flow.schemas import VehicleData
+from onboarding_flow.schemas import MAX_TRACE_ID_LENGTH, VehicleData
 from onboarding_flow.upstream import UpstreamFailureKind, UpstreamPort
 
 
 def test_health_endpoint(api_client: TestClient) -> None:
     response = api_client.get("/health")
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     assert response.json() == {"status": "ok"}
 
 
@@ -26,7 +27,7 @@ def test_vehicle_info_happy_path_matches_assignment_shape(
 ) -> None:
     response = api_client.post("/vehicle-info", json={"license_plate": assignment_plate})
 
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     body = response.json()
     assert body["success"] is True
     assert body["data"] == assignment_vehicle.model_dump(mode="json")
@@ -42,7 +43,7 @@ def test_vehicle_info_upstream_failure_returns_envelope_smoke(
     with open_api_client(upstream) as client:
         response = client.post("/vehicle-info", json={"license_plate": assignment_plate})
 
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     body = response.json()
     assert body["success"] is False
     assert body["error_code"] == ErrorCode.VEHICLE_NOT_FOUND.value
@@ -70,7 +71,7 @@ def test_trace_id_echoed_when_provided(
         headers={"X-Trace-ID": "client-trace-99"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     assert response.headers.get("x-trace-id") == "client-trace-99"
     assert response.json()["trace_id"] == "client-trace-99"
 
@@ -114,7 +115,7 @@ def test_unhandled_upstream_exception_logs_error_with_trace_id(
             headers={"X-Trace-ID": "client-trace-500"},
         )
 
-    assert response.status_code == 500
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
     errors = [line for line in json_logs if line["severity"] == "ERROR"]
     assert len(errors) == 1
     assert errors[0]["message"] == "request_failed"
@@ -138,15 +139,15 @@ def test_trace_id_invalid_header_is_replaced(
     api_client: TestClient,
     assignment_plate: str,
 ) -> None:
-    invalid = "x" * 129
+    invalid = "x" * (MAX_TRACE_ID_LENGTH + 1)
     response = api_client.post(
         "/vehicle-info",
         json={"license_plate": assignment_plate},
         headers={"X-Trace-ID": invalid},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == HTTPStatus.OK
     trace = response.json()["trace_id"]
     assert trace != invalid
-    assert len(trace) <= 128
+    assert len(trace) <= MAX_TRACE_ID_LENGTH
     assert response.headers.get("x-trace-id") == trace

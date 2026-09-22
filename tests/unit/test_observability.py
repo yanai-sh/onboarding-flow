@@ -6,6 +6,12 @@ import pytest
 
 from onboarding_flow.observability import mask_plate, parse_trace_id, trace_id_from_request
 
+UUID_VERSION_7 = 7
+
+
+def _assert_uuid7(trace: str) -> None:
+    assert uuid.UUID(trace).version == UUID_VERSION_7
+
 
 def test_mask_plate_hides_prefix() -> None:
     assert mask_plate("12345678") == "****5678"
@@ -17,12 +23,12 @@ def test_mask_plate_short_values() -> None:
 
 def test_parse_trace_id_generates_uuid7_when_header_missing() -> None:
     trace = parse_trace_id(None)
-    assert uuid.UUID(trace).version == 7
+    _assert_uuid7(trace)
 
 
 def test_parse_trace_id_generates_uuid7_when_header_blank() -> None:
     trace = parse_trace_id("   ")
-    assert uuid.UUID(trace).version == 7
+    _assert_uuid7(trace)
 
 
 def test_parse_trace_id_accepts_valid_client_value() -> None:
@@ -33,7 +39,7 @@ def test_parse_trace_id_replaces_invalid_header_with_uuid7() -> None:
     invalid = "x" * 200
     trace = parse_trace_id(invalid)
     assert trace != invalid
-    assert uuid.UUID(trace).version == 7
+    _assert_uuid7(trace)
 
 
 def test_trace_id_from_request_requires_middleware_state() -> None:

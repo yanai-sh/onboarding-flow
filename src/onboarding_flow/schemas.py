@@ -9,6 +9,7 @@ MAX_LICENSE_PLATE_LENGTH = 32
 VEHICLE_YEAR_MIN = 1900
 VEHICLE_YEAR_MAX = 2100
 VEHICLE_TEXT_MAX_LENGTH = 128
+MAX_TRACE_ID_LENGTH = 128
 
 
 def _strip_if_str(value: object) -> object:
@@ -39,7 +40,7 @@ LicensePlate = Annotated[
 
 TraceId = Annotated[
     str,
-    Field(min_length=1, max_length=128, pattern=r"[\x21-\x7E]+"),
+    Field(min_length=1, max_length=MAX_TRACE_ID_LENGTH, pattern=r"[\x21-\x7E]+"),
 ]
 
 _trace_id_adapter = TypeAdapter(TraceId)

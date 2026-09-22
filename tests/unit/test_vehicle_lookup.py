@@ -5,13 +5,14 @@ import pytest
 
 from onboarding_flow.envelope import ErrorCode
 from onboarding_flow.memory_upstream import failure_upstream, success_upstream
+from onboarding_flow.schemas import VehicleData
 from onboarding_flow.upstream import UpstreamFailureKind
 from onboarding_flow.vehicle_lookup import lookup_vehicle_info
 
 
 @pytest.mark.asyncio
 async def test_lookup_happy_path_calls_upstream_and_returns_envelope(
-    assignment_vehicle,
+    assignment_vehicle: VehicleData,
 ) -> None:
     upstream = success_upstream(assignment_vehicle)
     response = await lookup_vehicle_info(assignment_vehicle.license_plate, upstream, "trace-1")
@@ -33,7 +34,7 @@ async def test_lookup_happy_path_calls_upstream_and_returns_envelope(
 )
 @pytest.mark.asyncio
 async def test_lookup_maps_upstream_failures(
-    assignment_vehicle,
+    assignment_vehicle: VehicleData,
     kind: UpstreamFailureKind,
     expected_code: ErrorCode,
 ) -> None:
@@ -48,7 +49,7 @@ async def test_lookup_maps_upstream_failures(
 
 @pytest.mark.asyncio
 async def test_lookup_logs_masked_plate_not_raw_value(
-    assignment_vehicle,
+    assignment_vehicle: VehicleData,
     json_logs: list[dict[str, Any]],
 ) -> None:
     plate = assignment_vehicle.license_plate
@@ -73,7 +74,7 @@ async def test_lookup_logs_masked_plate_not_raw_value(
 )
 @pytest.mark.asyncio
 async def test_lookup_logs_failure_outcome(
-    assignment_vehicle,
+    assignment_vehicle: VehicleData,
     kind: UpstreamFailureKind,
     expected_code: str,
     json_logs: list[dict[str, Any]],
