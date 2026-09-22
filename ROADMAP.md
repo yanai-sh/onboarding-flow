@@ -5,16 +5,15 @@ only when its behavior is tested and the relevant acceptance evidence exists.
 
 ## Phase 0: Planning baseline
 
-**Status:** ready for implementation.
+**Status:** complete — assignment vocabulary in `CONTEXT.md`; service vs. Insait
+ownership documented.
 
 - Read the assignment and record its vocabulary in `CONTEXT.md`.
 - Keep the service/Insait ownership boundary explicit.
-- Treat the current health-only app and existing container files as scaffold,
-  not completed milestones.
 
 ## Phase 1: Vehicle lookup vertical slice
 
-**Blocked by:** Phase 0.
+**Status:** complete — `POST /vehicle-info` with injected upstream adapter.
 
 Build the smallest demonstrable path: validate a plate, call the upstream
 through an injected adapter, map the result, and serve `POST /vehicle-info`.
@@ -25,7 +24,7 @@ timeout, transport failure, upstream 5xx, and malformed payloads.
 
 ## Phase 2: Resilience and observability
 
-**Blocked by:** Phase 1.
+**Status:** complete — typed error envelope, trace IDs, masked logging.
 
 Add the five-second timeout, typed error envelope for expected upstream
 failures, trace-ID middleware, structlog context cleanup, and deterministic PII
@@ -36,17 +35,20 @@ safe fields, and no unhandled upstream exception.
 
 ## Phase 3: Cloud Run packaging
 
-**Blocked by:** Phase 2.
+**Status:** complete — multi-stage image, Granian on `$PORT`, container tests
+when Docker is available.
 
 Verify the locked `uv` build, multi-stage `python:3.14-slim` image,
 unprivileged runtime, Granian ASGI startup, and `$PORT`/8080 behavior.
 
-**Exit evidence:** repository checks pass and the image starts the health
-endpoint locally when Docker is available.
+**Exit evidence:** repository checks pass and the image starts locally when
+Docker is available (`./scripts/check-image.sh`).
 
 ## Phase 4: Manual Insait flow
 
-**Blocked by:** Phase 3 and approved Insait access.
+**Status:** current — requires approved Insait access and human platform work.
+
+**Blocked by:** approved Insait access and a deployed proxy URL.
 
 The human creates the Conversation Flow Agent, connects the deployed proxy,
 configures deterministic branches and conversational save tools, tests the

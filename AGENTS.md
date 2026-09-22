@@ -49,7 +49,6 @@ under `docs/adr/` when they exist. See `docs/agents/domain.md`.
 - Keep Insait-specific manual steps documented rather than pretending they are
   automated.
 - Run the repository checks proportionally before handing work back:
-  `uv run ruff check .`, `uv run ruff format --check .`,
-  `uv run ty check .`, and `uv run pytest`.
+  `./scripts/check.sh` (or the individual ruff, ty, and pytest commands).
 - Do not create remote labels, tags, branches, tickets, commits, or releases
   unless the user explicitly requests them.

@@ -17,8 +17,7 @@ graph LR
     B -->|typed success or error| A
 ```
 
-The current code contains only `/health`; all vehicle behavior below is
-planned.
+The service implements `/health` and `POST /vehicle-info` as described below.
 
 ## Service contract
 
@@ -51,7 +50,11 @@ APIResponse[T] = {
 ```
 
 Successful data is the assignment's vehicle shape: `license_plate`,
-`manufacturer`, `model`, `year`, and `color`. Error responses are still
+`manufacturer`, `model`, `year`, and `color`. The implementation validates
+that shape (including shared `LicensePlate` rules) when parsing upstream
+success payloads; invalid upstream data maps to `UPSTREAM_INVALID_RESPONSE`.
+JSON on the wire remains plain strings and numbers; `TraceId` and
+`LicensePlate` are internal Pydantic types. Error responses are still
 structured JSON and use HTTP 200 so the Insait graph can route on
 `success`/`error_code` without an unmapped upstream exception. Proxy input
 validation may use the framework's normal 4xx handling; upstream and adapter
@@ -75,7 +78,9 @@ by tests before implementation is considered complete.
   delegates to the vehicle lookup module.
 - **Vehicle lookup module**: orchestrates `UpstreamPort.fetch_vehicle`, maps
   through the response envelope module, and emits PII-safe completion logs.
-- **Request schemas**: `VehicleRequest` normalization and validation (ingress).
+- **Request schemas**: `VehicleRequest` and `VehicleData` share validated
+  `LicensePlate` (ingress and upstream success). Other vehicle fields have
+  minimal bounds on upstream success payloads.
 - **Response envelope module**: `VehicleInfoResponse`, error codes, builders,
   and mapping from `UpstreamOutcome` to the Insait-facing JSON contract.
 - **Upstream port**: accepts a validated plate and returns a typed success or
@@ -83,9 +88,10 @@ by tests before implementation is considered complete.
 - **niquests adapter**: owns the `AsyncSession`, URL, JSON encoding, timeout,
   status mapping, and response parsing. Tests replace this adapter at the
   seam; tests do not call the real upstream.
-- **Logging middleware**: creates or accepts `X-Trace-ID`, binds it to
+- **Logging middleware**: creates or accepts `X-Trace-ID` (invalid client
+  values are replaced with a generated id), binds validated `TraceId` to
   `structlog` context, and clears context after the request. Handlers read
-  trace ids via `trace_id_for_request`; they do not mint new ids.
+  trace ids via `trace_id_from_request`; they do not mint new ids.
 
 **Invalid license plates:** Pydantic validation on `VehicleRequest` fails at
 the Litestar ingress seam with HTTP **4xx** (framework validation body). The

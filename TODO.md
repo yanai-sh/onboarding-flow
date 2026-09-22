@@ -1,8 +1,8 @@
 # Implementation Checklist
 
-The repository is still at the scaffold stage: only `/health` and its test are
-implemented. Complete the tickets in `ROADMAP.md` in order; keep the Insait
-items as a human handoff.
+Part A (sections 1–3) is complete: the proxy exposes `POST /vehicle-info` with
+typed envelopes, boundary hardening, and automated tests. Remaining work is the
+manual Insait handoff in section 4. Track phase context in `ROADMAP.md`.
 
 ## 1. Contract and lookup slice
 
@@ -34,10 +34,9 @@ items as a human handoff.
   malformed upstream payloads through the adapter seam.
 - [x] Test controller routing and trace-ID propagation through Litestar's
   public HTTP seam.
-- [ ] Test the real container startup and Cloud Run `$PORT` behavior if Docker
-  is available.
-- [x] Run `uv run ruff check .`, `uv run ruff format --check .`,
-  `uv run ty check .`, and `uv run pytest`.
+- [x] Test the real container startup and Cloud Run `$PORT` behavior if Docker
+  is available (`./scripts/check-image.sh --container-force-build`).
+- [x] Run `./scripts/check.sh`.
 
 ## 4. Manual Insait handoff
 
@@ -47,7 +46,8 @@ items as a human handoff.
 - [ ] Configure deterministic API success/error and insurance-type branches.
 - [ ] Configure validation and correction loops for applicant details and the
   summary.
-- [ ] Deploy the proxy to Cloud Run and connect the public endpoint.
+- [ ] Deploy the proxy to Cloud Run ([`infra/README.md`](infra/README.md)) and connect
+  the public endpoint in Insait.
 - [ ] Test happy path, invalid input, vehicle not found, timeout/unavailable,
   correction, and Mandatory-without-add-ons paths in debug view.
 - [ ] Record the approximately three-minute end-to-end submission video and
