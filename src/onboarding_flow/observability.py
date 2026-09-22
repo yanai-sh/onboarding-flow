@@ -66,5 +66,15 @@ class TraceMiddleware(ASGIMiddleware):
             structlog.contextvars.clear_contextvars()
 
 
+def trace_id_for_request(request: Request) -> str:
+    """Return the trace id bound by TraceMiddleware; do not mint a new id here."""
+    trace_id = getattr(request.state, "trace_id", None)
+    if not trace_id:
+        msg = "trace_id missing; TraceMiddleware must run before handlers"
+        raise RuntimeError(msg)
+    return str(trace_id)
+
+
 def trace_id_from_request(request: Request) -> str:
-    return str(getattr(request.state, "trace_id", "") or uuid.uuid4())
+    """Alias for trace_id_for_request (legacy name)."""
+    return trace_id_for_request(request)
