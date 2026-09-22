@@ -4,9 +4,8 @@ import json
 import subprocess
 import time
 
-import niquests
+import httpx
 import pytest
-from niquests.exceptions import RequestException
 
 pytestmark = pytest.mark.container
 
@@ -37,10 +36,10 @@ def test_container_serves_health_on_port_8080(built_image: str) -> None:
         last_error: Exception | None = None
         while time.monotonic() < deadline:
             try:
-                response = niquests.get(health_url, timeout=2)
+                response = httpx.get(health_url, timeout=2)
                 if response.status_code == 200 and response.json() == {"status": "ok"}:
                     return
-            except (RequestException, json.JSONDecodeError, TypeError, ValueError) as exc:
+            except (httpx.HTTPError, json.JSONDecodeError, TypeError, ValueError) as exc:
                 last_error = exc
             time.sleep(0.5)
         msg = f"Container health check failed: {last_error}"

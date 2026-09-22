@@ -11,9 +11,9 @@ graph LR
     A[Insait Conversation Flow] -->|POST /vehicle-info| B[Litestar app]
     B --> C[Validation and response envelope]
     C --> D[Injected upstream adapter]
-    D -->|niquests AsyncSession| E[Encore vehicle-info endpoint]
+    D -->|httpx AsyncClient| E[Encore vehicle-info endpoint]
     E --> D
-    B --> F[structlog: trace ID + masked plate]
+    B --> F[JSON logs: trace ID + masked plate]
     B -->|typed success or error| A
 ```
 
@@ -85,12 +85,12 @@ by tests before implementation is considered complete.
   and mapping from `UpstreamOutcome` to the Insait-facing JSON contract.
 - **Upstream port**: accepts a validated plate and returns a typed success or
   failure outcome. Wired on `app.state` at composition time.
-- **niquests adapter**: owns the `AsyncSession`, URL, JSON encoding, timeout,
+- **httpx adapter**: owns the `AsyncClient`, URL, JSON encoding, timeout,
   status mapping, and response parsing. Tests replace this adapter at the
   seam; tests do not call the real upstream.
 - **Logging middleware**: creates or accepts `X-Trace-ID` (invalid client
   values are replaced with a generated id), binds validated `TraceId` to
-  `structlog` context, and clears context after the request. Handlers read
+  request state for trace ids. Handlers read
   trace ids via `trace_id_from_request`; they do not mint new ids.
 
 **Invalid license plates:** Pydantic validation on `VehicleRequest` fails at
@@ -102,7 +102,7 @@ outcomes continue to use HTTP **200** with `success` / `error_code`. See
 `docs/adr/0001-proxy-validation-4xx.md`.
 
 Dependencies are created at application composition time, not inside request
-handlers. The default adapter uses `niquests.AsyncSession` and a strict
+handlers. The default adapter uses `httpx.AsyncClient` and a strict
 five-second total timeout. No automatic retry is planned for this assignment:
 the user-facing flow must remain bounded and retries could amplify upstream
 load.

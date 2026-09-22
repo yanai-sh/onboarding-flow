@@ -19,7 +19,7 @@ Small production-shaped vertical slice for the Encore AI home assignment:
 
 Litestar on Granian exposes `POST /vehicle-info` (and `/health`). The proxy
 normalizes and validates alphanumeric plates, calls the upstream JSON endpoint
-via an injected `niquests.AsyncSession`, and returns typed Pydantic success and
+via an injected `httpx.AsyncClient`, and returns typed Pydantic success and
 error envelopes. Logs include a trace ID and masked plate only. Configuration at deploy time: `UPSTREAM_URL` and optional
 `UPSTREAM_TIMEOUT_SECONDS` (`onboarding_flow.config.Settings`).
 OpenAPI: `/schema/openapi.json` (Swagger UI at `/schema/swagger` when enabled).

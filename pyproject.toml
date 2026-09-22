@@ -11,11 +11,10 @@ requires-python = ">=3.14"
 authors = [{ name = "Yanai Klugman", email = "me@yanai.sh" }]
 dependencies = [
     "granian>=2.8.3",
+    "httpx>=0.28.0",
     "litestar>=2.24.0",
-    "niquests>=3.21.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
-    "structlog>=26.1.0",
 ]
 
 [dependency-groups]

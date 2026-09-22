@@ -1,10 +1,8 @@
-"""Production upstream adapter using niquests."""
+"""Production upstream adapter using httpx."""
 
 import json
 
-import niquests
-from niquests.exceptions import ConnectionError as NiquestsConnectionError
-from niquests.exceptions import Timeout as NiquestsTimeout
+import httpx
 from pydantic import HttpUrl, ValidationError
 
 from onboarding_flow.schemas import LicensePlate, VehicleData
@@ -33,7 +31,7 @@ def _outcome_from_upstream_body(body: object) -> UpstreamOutcome:
 class EncoreUpstream:
     def __init__(
         self,
-        session: niquests.AsyncSession,
+        session: httpx.AsyncClient,
         url: HttpUrl | str,
         timeout_seconds: float,
     ) -> None:
@@ -48,16 +46,12 @@ class EncoreUpstream:
                 json={"license_plate": license_plate},
                 timeout=self._timeout,
             )
-        except NiquestsTimeout:
+        except httpx.TimeoutException:
             return UpstreamFailure(kind=UpstreamFailureKind.TIMEOUT)
-        except NiquestsConnectionError:
+        except httpx.TransportError:
             return UpstreamFailure(kind=UpstreamFailureKind.UNAVAILABLE)
 
-        status_code = response.status_code
-        if status_code is None:
-            return UpstreamFailure(kind=UpstreamFailureKind.UNAVAILABLE)
-
-        match status_code:
+        match response.status_code:
             case 404:
                 return UpstreamFailure(kind=UpstreamFailureKind.NOT_FOUND)
             case code if code >= 500:

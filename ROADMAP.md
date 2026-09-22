@@ -17,7 +17,7 @@ ownership documented.
 
 Build the smallest demonstrable path: validate a plate, call the upstream
 through an injected adapter, map the result, and serve `POST /vehicle-info`.
-Use Litestar, Pydantic, and `niquests.AsyncSession`; preserve `/health`.
+Use Litestar, Pydantic, and `httpx.AsyncClient`; preserve `/health`.
 
 **Exit evidence:** public HTTP tests cover success, invalid input, not found,
 timeout, transport failure, upstream 5xx, and malformed payloads.
@@ -27,7 +27,7 @@ timeout, transport failure, upstream 5xx, and malformed payloads.
 **Status:** complete — typed error envelope, trace IDs, masked logging.
 
 Add the five-second timeout, typed error envelope for expected upstream
-failures, trace-ID middleware, structlog context cleanup, and deterministic PII
+failures, trace-ID middleware, JSON application logging, and deterministic PII
 masking. Keep dependencies injected at app composition time.
 
 **Exit evidence:** logs and response tests demonstrate trace correlation,

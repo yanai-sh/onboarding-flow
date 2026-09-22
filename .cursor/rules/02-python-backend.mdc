@@ -8,9 +8,9 @@ globs: "*.py"
 - **Runtime:** Python 3.14
 - **Framework:** `litestar` (utilizing Domain-Driven Design via class-based Controllers).
 - **Validation:** `pydantic` v2
-- **Networking:** Standardize on `niquests` for async HTTP/3 capabilities and OS-truststore compliance.
-- **Serving:** `granian` (ASGI) for maximum I/O concurrency and minimal memory footprint.
-- **Observability:** `structlog` for structured NDJSON output and trace propagation.
+- **Networking:** `httpx.AsyncClient` for outbound calls (shared in app lifespan).
+- **Serving:** `granian` (ASGI) on Cloud Run with `--interface asgi`, one worker, lifespan enabled.
+- **Observability:** stdlib `logging` with JSON lines on stdout; trace id on completion events.
 
 ## 2. Typing & Contracts
 - **Strict Typing:** All function signatures and API boundaries must be strictly typed.

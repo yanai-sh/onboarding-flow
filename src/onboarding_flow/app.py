@@ -3,12 +3,13 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import niquests
+import httpx
 from litestar import Litestar, get
 from litestar.openapi.config import OpenAPIConfig
 
 from onboarding_flow.config import get_settings
 from onboarding_flow.encore_upstream import EncoreUpstream
+from onboarding_flow.logging_config import configure_logging
 from onboarding_flow.observability import TraceMiddleware
 from onboarding_flow.upstream import UpstreamPort
 from onboarding_flow.vehicle import VehicleController
@@ -32,6 +33,7 @@ async def health() -> dict[str, str]:
 
 def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
     """Return the configured application for tests and ASGI servers."""
+    configure_logging()
     injected_upstream = upstream
 
     @asynccontextmanager
@@ -42,7 +44,7 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
             return
 
         settings = get_settings()
-        session = niquests.AsyncSession()
+        session = httpx.AsyncClient()
         try:
             app.state.upstream = EncoreUpstream(
                 session,
@@ -51,7 +53,7 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
             )
             yield
         finally:
-            await session.close()
+            await session.aclose()
 
     return Litestar(
         route_handlers=[health, VehicleController],

@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING, override
 
-import structlog
 from litestar.enums import ScopeType
 from litestar.middleware.base import ASGIMiddleware
 from litestar.types import ASGIApp, Message, Receive, Scope, Send
@@ -45,8 +44,6 @@ class TraceMiddleware(ASGIMiddleware):
         scope.setdefault("state", {})
         scope["state"]["trace_id"] = trace_id
 
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(trace_id=trace_id)
         encoded_trace = trace_id.encode()
 
         async def send_wrapper(message: Message) -> None:
@@ -60,10 +57,7 @@ class TraceMiddleware(ASGIMiddleware):
                 case _:
                     await send(message)
 
-        try:
-            await next_app(scope, receive, send_wrapper)
-        finally:
-            structlog.contextvars.clear_contextvars()
+        await next_app(scope, receive, send_wrapper)
 
 
 def trace_id_from_request(request: Request) -> TraceId:

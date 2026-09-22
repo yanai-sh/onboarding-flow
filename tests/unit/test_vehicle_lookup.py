@@ -53,9 +53,10 @@ async def test_lookup_logs_masked_plate_not_raw_value(assignment_vehicle) -> Non
         await lookup_vehicle_info(plate, upstream, "trace-log")
 
     log_info.assert_called_once()
-    kwargs = log_info.call_args.kwargs
-    assert kwargs["plate_mask"] == "****5678"
-    assert plate not in kwargs.values()
+    extra = log_info.call_args.kwargs["extra"]
+    assert extra["plate_mask"] == "****5678"
+    assert extra["trace_id"] == "trace-log"
+    assert plate not in extra.values()
 
 
 @pytest.mark.parametrize(
@@ -75,6 +76,6 @@ async def test_lookup_logs_failure_outcome(
     with patch("onboarding_flow.vehicle_lookup.logger.info") as log_info:
         await lookup_vehicle_info(plate, upstream, "trace-log")
 
-    kwargs = log_info.call_args.kwargs
-    assert kwargs["success"] is False
-    assert kwargs["error_code"] is not None
+    extra = log_info.call_args.kwargs["extra"]
+    assert extra["success"] is False
+    assert extra["error_code"] is not None

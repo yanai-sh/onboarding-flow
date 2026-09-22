@@ -13,7 +13,7 @@ manual Insait handoff in section 4. Track phase context in `ROADMAP.md`.
   format.
 - [x] Define the vehicle lookup interface and inject it into the Litestar
   controller.
-- [x] Implement the niquests adapter with the supplied URL, JSON POST, and
+- [x] Implement the httpx upstream adapter with the supplied URL, JSON POST, and
   strict five-second timeout.
 - [x] Map not found, timeout, transport, upstream status, and invalid payload
   failures to stable error codes and safe messages.
@@ -22,7 +22,7 @@ manual Insait handoff in section 4. Track phase context in `ROADMAP.md`.
 ## 2. Boundary hardening
 
 - [x] Add trace-ID middleware for incoming or generated `X-Trace-ID` values.
-- [x] Bind and clear structlog context per request.
+- [x] Emit PII-safe JSON completion logs with trace id per request.
 - [x] Verify logs contain no raw plate, name, phone, or email values.
 - [x] Ensure expected upstream failures produce structured responses rather
   than unhandled 5xx errors.

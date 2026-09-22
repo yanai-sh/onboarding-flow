@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from onboarding_flow.encore_upstream import EncoreUpstream
@@ -80,6 +81,48 @@ async def test_encore_upstream_maps_http_404() -> None:
     outcome = await adapter.fetch_vehicle("12345678")
 
     _assert_upstream_failure(outcome, UpstreamFailureKind.NOT_FOUND)
+
+
+@pytest.mark.asyncio
+async def test_encore_upstream_maps_timeout() -> None:
+    session = MagicMock()
+    session.post = AsyncMock(side_effect=httpx.ReadTimeout("upstream slow"))
+
+    adapter = EncoreUpstream(session, "https://example.test/vehicle-info", 5.0)
+    outcome = await adapter.fetch_vehicle("12345678")
+
+    _assert_upstream_failure(outcome, UpstreamFailureKind.TIMEOUT)
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        httpx.ConnectError("refused"),
+        httpx.RemoteProtocolError("connection closed"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_encore_upstream_maps_transport_errors(exc: httpx.TransportError) -> None:
+    session = MagicMock()
+    session.post = AsyncMock(side_effect=exc)
+
+    adapter = EncoreUpstream(session, "https://example.test/vehicle-info", 5.0)
+    outcome = await adapter.fetch_vehicle("12345678")
+
+    _assert_upstream_failure(outcome, UpstreamFailureKind.UNAVAILABLE)
+
+
+@pytest.mark.asyncio
+async def test_encore_upstream_maps_http_5xx() -> None:
+    session = MagicMock()
+    response = MagicMock()
+    response.status_code = 503
+    session.post = AsyncMock(return_value=response)
+
+    adapter = EncoreUpstream(session, "https://example.test/vehicle-info", 5.0)
+    outcome = await adapter.fetch_vehicle("12345678")
+
+    _assert_upstream_failure(outcome, UpstreamFailureKind.UNAVAILABLE)
 
 
 @pytest.mark.asyncio
