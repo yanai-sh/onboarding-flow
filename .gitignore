@@ -33,6 +33,10 @@ infra/terraform/*.tfvars
 !.cursor/rules/
 .scratch/
 
+# Third-party agent skills: installed locally, not vendored
+.agents/
+skills-lock.json
+
 # Assignment source (local only)
 docs/FDE_Home_Assignment.pdf
 
