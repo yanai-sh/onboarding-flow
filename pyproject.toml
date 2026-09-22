@@ -16,12 +16,14 @@ dependencies = [
     "litestar>=2.24.0",
     "niquests>=3.21.1",
     "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.16.8",
     "ty>=0.0.83",
 ]
@@ -29,3 +31,5 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
