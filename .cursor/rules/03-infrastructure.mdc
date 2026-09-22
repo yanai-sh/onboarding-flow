@@ -1,18 +1,35 @@
 ---
-description: Containerization, security, and deployment standards for Cloud Run.
-globs: ["Dockerfile", ".dockerignore"]
+description: Docker BuildKit, Granian image env, Terraform, and Cloud Run deploy.
+globs:
+  - Dockerfile
+  - .dockerignore
+  - cloudbuild.yaml
+  - scripts/docker-build.sh
+  - scripts/check-image.sh
+  - infra/**
 ---
 # Deployment Standards
 
-## 1. Containerization Strategy
-- **BuildKit only:** Dockerfiles use `# syntax=docker/dockerfile:1` and BuildKit
-  features (`RUN --mount=type=cache`, bind mounts). Do not add legacy-builder
-  fallbacks. Local builds set `DOCKER_BUILDKIT=1`; require `docker buildx`.
-- **Minimal footprint:** Multi-stage builds; dev dependencies never in runtime.
-- **Toolchain:** `ghcr.io/astral-sh/uv:latest` in the builder stage.
-- **Runtime:** `python:3.14-slim`, unprivileged `appuser`.
+## Container
 
-## 2. Security & Execution
-- **Least privilege:** Process runs as `appuser`, not root.
-- **Performance:** `UV_COMPILE_BYTECODE=1` in builder; Granian ASGI on `$PORT`
-  (default 8080) for Cloud Run.
+- BuildKit only: `# syntax=docker/dockerfile:1`, cache/bind mounts, `docker buildx`.
+  Legacy `docker build` and bare `gcloud builds submit --tag` fail this Dockerfile.
+- Multi-stage: `uv` locked sync in builder; `python:3.14-slim` + `appuser` runtime.
+- Granian settings are `GRANIAN_*` **image ENV**, not `CMD` flags (ADR 0002).
+  Image facts: `asgi`, `0.0.0.0`, one worker, no WS, no access log, 8s kill timeout.
+  Shell resolves only `$PORT` → Granian; `exec granian` keeps PID 1 for SIGTERM.
+- Prefer Cloud Build (`cloudbuild.yaml`, amd64) from aarch64 WSL; local push needs
+  buildx + QEMU for `linux/amd64`. See `infra/README.md`.
+
+## Terraform / Cloud Run
+
+- Declarative stack lives under `infra/terraform/`; follow `infra/README.md`.
+- Runtime env from Terraform: `UPSTREAM_URL`, `UPSTREAM_TIMEOUT_SECONDS`,
+  `LOG_LEVEL`, optional `GRANIAN_WORKERS_KILL_TIMEOUT`.
+- Do not commit `terraform.tfvars`, credentials, or project secrets.
+- Public `run.invoker` is intentional for Insait; treat auth as out of scope.
+
+## Checks
+
+- Image behavior: `./scripts/check-image.sh` when Docker is available.
+- Do not expand the image with retries, sidecars, or extra processes.

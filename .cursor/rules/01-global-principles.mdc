@@ -1,13 +1,29 @@
 ---
-description: Global engineering principles and code quality standards for the Encore proxy.
+description: Scope, resilience, and post-Part-A judgment for the vehicle-lookup proxy.
 alwaysApply: true
 ---
-# Enterprise Engineering Principles
+# Engineering Principles
 
-## 1. Simplicity & Scope
-- **Lean Implementations:** Maintain a minimal dependency footprint. Defer heavy data processing, NLP, and complex analytics to downstream systems rather than embedding them in the proxy layer.
-- **Code Style:** Write clean, self-documenting code. Comments should explain the *why* of complex logic, not restate the *what*. Keep docstrings strictly functional and concise; defer broad architectural explanations to `ARCHITECTURE.md`.
+## Phase and scope
 
-## 2. Resilience & Boundary Design
-- **Railway-Oriented Programming (ROP):** Treat all external network boundaries as unreliable. Upstream webhooks and APIs will fail.
-- **Graceful Degradation:** Never allow an unhandled upstream exception (e.g., 504 Timeout, 404 Not Found) to crash the application or return an unmapped 500 to the client. All external failures must be caught, mapped, and returned as a structured, strongly typed 200 OK JSON error envelope.
+Part A (proxy + packaging) is **complete**. Prefer protecting the shipped contract
+over new features. Remaining assignment work is Phase 4: deploy + manual Insait
+handoff (`ROADMAP.md`, `TODO.md` §4). Read `CONTEXT.md` and `ARCHITECTURE.md`
+before changing behavior; ADRs under `docs/adr/` win on disputed contracts.
+
+Out of scope (do not add): retries, caching, auth, persistence, pricing, OTEL,
+semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
+
+## Lean proxy
+
+- Minimal dependencies; one HTTP stack (`httpx`), one logging pipeline (stdlib).
+- Comments explain *why*; architecture lives in `ARCHITECTURE.md`.
+- Composition wires deps in the lifespan; handlers do not construct clients.
+
+## Resilience at the boundary
+
+- Upstream and adapter failures → typed `VehicleInfoResponse` on **HTTP 200**
+  (`success` / `error_code`). Never unmapped 5xx from expected upstream faults.
+- Proxy ingress validation → framework **4xx** (ADR 0001). Do not invent a
+  second path that returns `INVALID_REQUEST` in the envelope without an ADR.
+- No automatic retries; keep the user-facing path bounded.

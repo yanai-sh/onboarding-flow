@@ -1,21 +1,38 @@
 ---
-description: Python backend standards, framework preferences, and typing strictness.
-globs: "*.py"
+description: Litestar/Pydantic seams, httpx, logging, and test conventions.
+globs: "**/*.py"
 ---
 # Python Backend Standards
 
-## 1. Stack & Tooling
-- **Runtime:** Python 3.14
-- **Framework:** `litestar` (utilizing Domain-Driven Design via class-based Controllers).
-- **Validation:** `pydantic` v2
-- **Networking:** `httpx.AsyncClient` for outbound calls, one client per process created in the app lifespan. HTTP/3 is out of scope (see `docs/adr/0002`).
-- **Serving:** `granian` configured via `GRANIAN_*` env in the Dockerfile: `asgi` interface (lifespan is Granian's ASGI default; do not switch to `asginl`), one worker, no WebSockets, no access log.
-- **Observability:** stdlib `logging` through `onboarding_flow.logging_config` (JSON lines, Cloud Logging field names). Use `logging.getLogger(__name__)` and pass structured fields via `extra=`; the request `trace_id` is attached automatically by the handler filter. Never log request/response bodies or raw plates.
+## Stack (locked)
 
-## 2. Typing & Contracts
-- **Strict Typing:** All function signatures and API boundaries must be strictly typed.
-- **Generic Envelopes:** Enforce the API contract using a generic `APIResponse[T]` schema for all inbound and outbound data.
+- Python 3.14 · Litestar controllers · Pydantic v2 · `pydantic-settings`
+- Outbound: process-scoped `httpx.AsyncClient` in lifespan (ADR 0002)
+- Serve: Granian ASGI via `GRANIAN_*` image env — interface `asgi`, not `asginl`
+- Logs: stdlib JSON via `onboarding_flow.logging_config`; `extra=` fields only
+- Absolute imports only (`ban-relative-imports`)
 
-## 3. Security & Telemetry
-- **Traceability:** `TraceMiddleware` accepts or mints `X-Trace-ID`, echoes it on the response, and sets the `TRACE_ID` contextvar for the request.
-- **PII Handling:** Ensure sensitive data (e.g., raw license plates) is masked or sliced via Pydantic validators or logging middleware before being flushed to stdout.
+## Seams to respect
+
+- `UpstreamPort` on `app.state`; tests inject `MemoryUpstream` (or fakes) — never
+  hit the real Encore URL in unit tests.
+- `VehicleRequest` / `LicensePlate` at ingress; shared plate rules on success
+  parse. Invalid ingress → 4xx (ADR 0001).
+- Envelope: `APIResponse[T]` / `VehicleInfoResponse`; map `UpstreamOutcome` in
+  `envelope.py`. Do not mint `trace_id` in handlers — read via observability.
+- Settings: `UPSTREAM_URL`, `UPSTREAM_TIMEOUT_SECONDS`, `LOG_LEVEL` only.
+
+## Observability and PII
+
+- `TraceMiddleware` accepts or replaces `X-Trace-ID`; ContextVar → every record.
+- Five events only (see `ARCHITECTURE.md`). Never log raw plates, bodies, or
+  PII; use `plate_mask`. Exception messages state the rule, never the value
+  (`msg = "..."; raise X(msg)`); ruff `EM`/`TRY`/`G` enforce the shape, the
+  500-path test enforces the content.
+- Unhandled 5xx: `after_exception` → `request_failed`; 4xx stay silent.
+
+## Verification
+
+- Behavior changes: update unit tests at the public HTTP or port seam.
+- Default gate: `./scripts/check.sh` (ruff, ty, `tests/unit`).
+- Container smoke (optional): `./scripts/check-image.sh`.

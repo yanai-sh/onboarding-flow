@@ -1,0 +1,40 @@
+---
+description: Manual Insait Conversation Flow handoff; do not automate the platform UI.
+globs:
+  - ARCHITECTURE.md
+  - TODO.md
+  - ROADMAP.md
+  - CONTEXT.md
+  - README.md
+  - docs/**/*.md
+  - infra/README.md
+---
+# Insait Handoff (Phase 4)
+
+## Ownership
+
+The repository ships the proxy contract and documents the flow. A human with
+Insait access creates, deploys, tests, and records the Conversation Flow Agent.
+Never imply that repo code or scripts automated the Insait UI.
+
+## Document, don't invent
+
+- Flow shape and branching: `ARCHITECTURE.md` (≤6 nodes, no Collect Node).
+- Checklist and evidence: `TODO.md` §4; phase status: `ROADMAP.md`.
+- Deploy URL for Insait: Cloud Run via `infra/README.md` after Terraform apply.
+- OpenAPI for integration: `/schema/openapi.json` (Swagger at `/schema/swagger`).
+
+## Client contract reminders
+
+- Happy path and upstream faults: HTTP **200** + `success` / `error_code`.
+- Bad plates at the proxy: HTTP **4xx** (ADR 0001) — Insait should pre-validate
+  and/or branch on client errors; do not "fix" docs to claim envelope-only errors.
+- Error codes for routing: `VEHICLE_NOT_FOUND`, `UPSTREAM_TIMEOUT`,
+  `UPSTREAM_UNAVAILABLE`, `UPSTREAM_INVALID_RESPONSE` (+ reserved `INVALID_REQUEST`).
+
+## Agent behavior
+
+- Produce wizards, checklists, or runbook edits for human steps; do not claim
+  platform actions completed without evidence from the user.
+- Keep submission artifacts (flow link, workspace/agent name, recording) as
+  documented handoff items, not code deliverables.

@@ -1,30 +1,26 @@
 ---
-description: Git history, Conventional Commit, signing, and pre-push standards.
+description: Conventional Commits, signing, and pre-push checks for this solo repo.
 alwaysApply: true
 ---
 # Git Workflow Standards
 
-## Commit Structure
+## Commits
 
-- Keep commits atomic and reviewable.
-- Use Conventional Commits: `type(scope): imperative summary`.
-- Prefer precise scopes such as `app`, `container`, `ci`, `docs`, or `agent`.
-- Do not commit WIP, fixup, generated files, credentials, or unrelated cleanup.
-- Keep a solo project's history proportionate; avoid splitting trivial changes into
-  many commits.
+- Atomic, reviewable; Conventional Commits: `type(scope): imperative summary`.
+- Prefer scopes: `app`, `container`, `infra`, `ci`, `docs`, `logging`, `agent`.
+- No WIP, fixup, generated noise, credentials, or `terraform.tfvars`.
+- Part A is shipped: prefer small polish, docs, and deploy/handoff commits over
+  speculative features. Keep history proportionate for a solo take-home.
 
 ## Signing
 
-- Create signed commits; repository signing is expected to remain enabled.
-- Before pushing, verify signatures with:
-  `git log --show-signature --format=fuller -n 5`.
-- Never disable signing to bypass a commit failure.
+- Signed commits required; never disable signing to bypass a failure.
+- Before push: `git log --show-signature --format=fuller -n 5`.
 
-## Pre-push Review
+## Pre-push / handoff
 
-- Confirm `git status` is clean.
-- Run the repository's lint, format, type, and test checks.
-- Review staged content with `git diff --cached --check` and
-  `git diff --cached --stat`.
-- Confirm the commit sequence tells a coherent story from scaffold to feature.
-- Do not rewrite history after pushing without explicit approval.
+- Clean `git status`; review with `git diff --cached --check` and `--stat`.
+- Run `./scripts/check.sh` for app changes; add `./scripts/check-image.sh` when
+  Dockerfile or runtime env behavior changes.
+- Do not rewrite history after push without explicit approval.
+- Do not create remotes, tags, or releases unless the user asks.
