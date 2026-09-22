@@ -1,0 +1,31 @@
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
+
+[project]
+name = "onboarding-flow"
+version = "0.1.0"
+description = "Encore AI Car Insurance Onboarding FDE Assignment"
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [
+    { name = "Yanai Klugman", email = "me@yanai.sh" }
+]
+dependencies = [
+    "granian>=2.8.3",
+    "litestar>=2.24.0",
+    "niquests>=3.21.1",
+    "pydantic>=2.13.5",
+    "structlog>=26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+    "ty>=0.0.83",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

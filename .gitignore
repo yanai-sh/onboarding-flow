@@ -1,0 +1,22 @@
+# Python & Bytecode
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+pytest-cache-files-*/
+*.egg-info
+*$py.class
+*.py[oc]
+build/
+dist/
+wheels/
+
+# Virtual environments
+.venv
+.env
+
+# Cursor
+.cursor/*
+!.cursor/rules/
+
+# Docs
+docs/FDE_Home_Assignment.pdf

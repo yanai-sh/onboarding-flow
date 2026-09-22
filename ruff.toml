@@ -1,0 +1,38 @@
+# ruff.toml
+
+target-version = "py314"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes correctness
+    "I",   # isort import ordering
+    "UP",  # pyupgrade (modern 3.x idioms)
+    "B",   # flake8-bugbear (design flaws & bugs)
+    "SIM", # flake8-simplify
+    "RUF", # Ruff-specific rules
+]
+
+# Exclude standard build and environment directories
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[lint.flake8-bugbear]
+# Whitelist framework-specific dependency injections from triggering B008 (function calls in defaults)
+extend-immutable-calls = [
+    "pydantic.Field",
+    "litestar.params.Parameter",
+    "litestar.di.Provide",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
