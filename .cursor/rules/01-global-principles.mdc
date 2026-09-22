@@ -1,0 +1,13 @@
+---
+description: Global engineering principles and code quality standards for the Encore proxy.
+alwaysApply: true
+---
+# Enterprise Engineering Principles
+
+## 1. Simplicity & Scope
+- **Lean Implementations:** Maintain a minimal dependency footprint. Defer heavy data processing, NLP, and complex analytics to downstream systems rather than embedding them in the proxy layer.
+- **Code Style:** Write clean, self-documenting code. Comments should explain the *why* of complex logic, not restate the *what*. Keep docstrings strictly functional and concise; defer broad architectural explanations to `ARCHITECTURE.md`.
+
+## 2. Resilience & Boundary Design
+- **Railway-Oriented Programming (ROP):** Treat all external network boundaries as unreliable. Upstream webhooks and APIs will fail.
+- **Graceful Degradation:** Never allow an unhandled upstream exception (e.g., 504 Timeout, 404 Not Found) to crash the application or return an unmapped 500 to the client. All external failures must be caught, mapped, and returned as a structured, strongly typed 200 OK JSON error envelope.

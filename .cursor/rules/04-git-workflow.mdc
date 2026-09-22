@@ -1,0 +1,30 @@
+---
+description: Git history, Conventional Commit, signing, and pre-push standards.
+alwaysApply: true
+---
+# Git Workflow Standards
+
+## Commit Structure
+
+- Keep commits atomic and reviewable.
+- Use Conventional Commits: `type(scope): imperative summary`.
+- Prefer precise scopes such as `app`, `container`, `ci`, `docs`, or `agent`.
+- Do not commit WIP, fixup, generated files, credentials, or unrelated cleanup.
+- Keep a solo project's history proportionate; avoid splitting trivial changes into
+  many commits.
+
+## Signing
+
+- Create signed commits; repository signing is expected to remain enabled.
+- Before pushing, verify signatures with:
+  `git log --show-signature --format=fuller -n 5`.
+- Never disable signing to bypass a commit failure.
+
+## Pre-push Review
+
+- Confirm `git status` is clean.
+- Run the repository's lint, format, type, and test checks.
+- Review staged content with `git diff --cached --check` and
+  `git diff --cached --stat`.
+- Confirm the commit sequence tells a coherent story from scaffold to feature.
+- Do not rewrite history after pushing without explicit approval.
