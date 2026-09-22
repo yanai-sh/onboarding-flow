@@ -44,9 +44,14 @@ def test_json_formatter_omits_none_values() -> None:
     assert "error_code" not in payload
 
 
+def _boom() -> None:
+    msg = "boom"
+    raise ValueError(msg)
+
+
 def test_json_formatter_renders_exceptions_on_one_line() -> None:
     try:
-        raise ValueError("boom")
+        _boom()
     except ValueError:
         record = _record("failed", level=logging.ERROR, exc_info=sys.exc_info())
 

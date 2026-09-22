@@ -14,8 +14,6 @@ _STANDARD_ATTRS = frozenset(
     {*vars(logging.LogRecord("", logging.INFO, "", 0, "", None, None)), "message", "asctime"}
 )
 
-_CONFIGURED = False
-
 
 class TraceIdFilter(logging.Filter):
     """Attach the current request's trace id unless the record set one explicitly."""
@@ -36,9 +34,11 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "logger": record.name,
         }
-        for key, value in vars(record).items():
-            if key not in _STANDARD_ATTRS and value is not None:
-                payload[key] = value
+        payload.update(
+            (key, value)
+            for key, value in vars(record).items()
+            if key not in _STANDARD_ATTRS and value is not None
+        )
         if record.exc_info:
             payload["stack_trace"] = self.formatException(record.exc_info)
         return json.dumps(payload, default=str)
@@ -49,10 +49,10 @@ def configure_logging(level: str = "INFO") -> None:
 
     Granian configures stdlib logging before loading the app, so calling this at
     app construction lets the same handler own the ``_granian`` worker logger.
-    Idempotent: the first call wins.
+    Idempotent: a root handler already emitting JSON means the pipeline is in
+    place, so ``dictConfig`` (which replaces root handlers) is not re-run.
     """
-    global _CONFIGURED
-    if _CONFIGURED:
+    if any(isinstance(h.formatter, JsonFormatter) for h in logging.getLogger().handlers):
         return
 
     logging.config.dictConfig(
@@ -75,4 +75,3 @@ def configure_logging(level: str = "INFO") -> None:
             "root": {"handlers": ["stdout"], "level": level},
         }
     )
-    _CONFIGURED = True

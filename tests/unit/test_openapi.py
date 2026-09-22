@@ -8,9 +8,7 @@ from onboarding_flow.schemas import VehicleData, VehicleRequest
 
 def _property_names(component_schema: dict[str, Any]) -> set[str]:
     properties = component_schema.get("properties")
-    if not isinstance(properties, dict):
-        msg = "OpenAPI component schema missing properties"
-        raise AssertionError(msg)
+    assert isinstance(properties, dict), "OpenAPI component schema missing properties"
     return set(properties)
 
 

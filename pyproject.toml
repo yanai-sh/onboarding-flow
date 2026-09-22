@@ -45,11 +45,28 @@ src = ["src"]
 extend-exclude = [".agents"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-exclude = [".git", ".venv", "__pycache__", "build", "dist"]
+select = [
+    # Correctness and style baseline
+    "E", "W", "F", "I", "UP", "B", "SIM", "RUF", "N", "C4", "PIE", "RET", "RSE", "PERF", "FURB",
+    "PLE", "PLW", "PTH", "DTZ", "ERA", "T20", "PGH",
+    # Exceptions and logging: messages state the rule, never the value (PII in stack traces),
+    # log calls pass fields via extra= rather than interpolating them into the message
+    "EM", "TRY", "BLE", "LOG", "G",
+    # Security and boundaries
+    "S", "ASYNC", "SLF", "TID", "INP",
+    # Tests
+    "PT",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is the test idiom; integration tests invoke the docker CLI by name on purpose
+"tests/**" = ["S101", "S603", "S607"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["onboarding_flow", "tests"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
