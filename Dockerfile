@@ -29,15 +29,31 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-RUN useradd --create-home --shell /bin/bash appuser
+RUN useradd --create-home --shell /usr/sbin/nologin appuser
 
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
-ENV PATH="/app/.venv/bin:$PATH"
+# Image facts: how this application is served, true in every environment.
+# Deployment-specific values (LOG_LEVEL, GRANIAN_WORKERS_KILL_TIMEOUT) have
+# sane defaults here and are overridden by Terraform per environment.
+#   - one worker: scale on Cloud Run replicas; the app owns one httpx client per process
+#   - kill timeout under Cloud Run's 10s SIGTERM grace so lifespan shutdown runs
+#   - no access log: Cloud Run records every request at the edge already
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080 \
+    LOG_LEVEL=INFO \
+    GRANIAN_HOST=0.0.0.0 \
+    GRANIAN_INTERFACE=asgi \
+    GRANIAN_WORKERS=1 \
+    GRANIAN_WEBSOCKETS=false \
+    GRANIAN_WORKERS_KILL_TIMEOUT=8s \
+    GRANIAN_LOG_ACCESS_ENABLED=false
 
 USER appuser
 
-ENV PORT=8080
 EXPOSE 8080
 
-CMD ["sh", "-c", "exec granian --interface asgi onboarding_flow.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Cloud Run injects PORT at runtime; Granian only reads GRANIAN_PORT, so it is
+# the one value resolved by the shell. `exec` keeps Granian as PID 1 for signals.
+CMD ["sh", "-c", "exec granian --port \"${PORT}\" onboarding_flow.app:app"]

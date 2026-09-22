@@ -29,6 +29,16 @@ resource "google_cloud_run_v2_service" "app" {
         value = tostring(var.upstream_timeout_seconds)
       }
 
+      env {
+        name  = "LOG_LEVEL"
+        value = var.log_level
+      }
+
+      env {
+        name  = "GRANIAN_WORKERS_KILL_TIMEOUT"
+        value = var.granian_workers_kill_timeout
+      }
+
       resources {
         limits = {
           cpu    = "1"

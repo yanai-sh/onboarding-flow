@@ -39,6 +39,23 @@ variable "upstream_timeout_seconds" {
   default     = 5
 }
 
+variable "log_level" {
+  description = "Application and Granian worker log level passed as LOG_LEVEL."
+  type        = string
+  default     = "INFO"
+
+  validation {
+    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], var.log_level)
+    error_message = "log_level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL."
+  }
+}
+
+variable "granian_workers_kill_timeout" {
+  description = "Grace given to in-flight requests and lifespan shutdown on SIGTERM. Keep under Cloud Run's 10s termination grace."
+  type        = string
+  default     = "8s"
+}
+
 variable "allow_unauthenticated" {
   description = "Grant roles/run.invoker to allUsers so Insait can call POST /vehicle-info."
   type        = bool
