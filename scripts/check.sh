@@ -2,16 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-  echo "error: do not run this script with sudo." >&2
-  echo "  uv and the project .venv live in your user account (~/.local/bin, .venv)." >&2
-  echo "  Run: bash scripts/check.sh" >&2
-  exit 1
-fi
-
-if ! command -v uv >/dev/null 2>&1; then
-  echo "error: uv not found on PATH." >&2
-  echo "  Install: https://docs.astral.sh/uv/getting-started/installation/" >&2
+# Plain root (containers, CI sandboxes) is fine; sudo from a user checkout would
+# leave root-owned files in .venv and the tool caches.
+if [[ -n "${SUDO_USER:-}" ]]; then
+  echo "error: run without sudo (it leaves root-owned files in .venv and caches)." >&2
   exit 1
 fi
 

@@ -5,7 +5,7 @@
 # =========================================================================
 FROM python:3.14-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.14@sha256:1025398289b62de8269e70c45b91ffa37c373f38118d7da036fb8bb8efc85d97 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -17,6 +17,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
+# The build context is allowlisted in .dockerignore (package metadata + src/ only).
 COPY . /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \

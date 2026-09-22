@@ -1,36 +1,10 @@
-# Version control & CI
-.git
-.gitignore
-.github
-
-# Editor & local workspace
-.cursor
-.vscode
-.idea
-.scratch
-.DS_Store
-
-# Python (not needed in the runtime image)
-.venv
-__pycache__
-*.py[cod]
-*$py.class
-.pytest_cache
-.ruff_cache
-dist
-build
-*.egg-info
-
-# Docs, tests, and planning (runtime uses packaged src only)
-tests
-docs
-ARCHITECTURE.md
-ROADMAP.md
-TODO.md
-CONTEXT.md
-AGENTS.md
-# README.md is required by uv_build (pyproject readme = "README.md")
-
-# Secrets
-.env
-.env.*
+# Allowlist: the image needs only package metadata and the source package.
+# Everything else (infra/ with Terraform state and tfvars, .env, .git, docs,
+# tests, agent config) never enters the build context.
+*
+!pyproject.toml
+!uv.lock
+# uv_build requires the readme declared in pyproject.toml
+!README.md
+!src/
+**/__pycache__

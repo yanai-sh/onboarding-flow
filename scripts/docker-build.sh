@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Build the service image with docker buildx (BuildKit), not the legacy builder.
+# Used locally and by cloudbuild.yaml, so the build flags live in one place.
 set -euo pipefail
 
 usage() {
   echo "Usage: $0 [--push] IMAGE [PLATFORM]" >&2
-  echo "  IMAGE     Full tag, e.g. us-central1-docker.pkg.dev/PROJECT/onboarding-flow/onboarding-flow:latest" >&2
-  echo "  PLATFORM  Default linux/amd64 (Cloud Run). Use linux/arm64 for native local smoke." >&2
+  echo "  IMAGE     Full tag, e.g. us-central1-docker.pkg.dev/PROJECT/onboarding-flow/onboarding-flow:SHA" >&2
+  echo "  PLATFORM  Default linux/amd64 (Cloud Run). Use linux/arm64 for a native aarch64 build." >&2
   exit 1
 }
 
@@ -19,16 +20,9 @@ IMAGE="${1:-}"
 PLATFORM="${2:-linux/amd64}"
 [[ -n "$IMAGE" ]] || usage
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "error: docker not found" >&2
-  exit 1
-fi
-if ! docker buildx version >/dev/null 2>&1; then
-  echo "error: docker buildx required (sudo dnf install -y docker-buildx)" >&2
-  exit 1
-fi
+docker buildx version >/dev/null || { echo "error: docker buildx (BuildKit) required" >&2; exit 1; }
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$(dirname "$0")/.."
 BUILDER_NAME="onboarding-flow-buildx"
 
 if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
@@ -38,7 +32,6 @@ else
 fi
 docker buildx inspect --bootstrap
 
-cd "$ROOT"
 BUILD_OPTS=(--platform "$PLATFORM" --provenance=false --sbom=false --tag "$IMAGE")
 if [[ "$PUSH" -eq 1 ]]; then
   docker buildx build "${BUILD_OPTS[@]}" --push .

@@ -21,10 +21,14 @@ variable "artifact_registry_repository_id" {
   default     = "onboarding-flow"
 }
 
-variable "container_image" {
-  description = "Full image URI (region-docker.pkg.dev/PROJECT/REPO/onboarding-flow:TAG). Set via -var at apply time."
+variable "image_tag" {
+  description = "Image tag pushed by cloudbuild.yaml (git short SHA). Pass per deploy: -var image_tag=$(git rev-parse --short HEAD)."
   type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+
+  validation {
+    condition     = var.image_tag != "" && var.image_tag != "latest"
+    error_message = "image_tag must be an immutable tag such as the git short SHA; Cloud Run only rolls a new revision when the image reference changes."
+  }
 }
 
 variable "upstream_url" {

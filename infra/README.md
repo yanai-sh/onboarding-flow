@@ -1,155 +1,95 @@
-# GCP infrastructure (Terraform)
+# GCP deploy (Terraform + Cloud Build)
 
-Terraform stack for Part A: enable APIs, Artifact Registry, Cloud Run v2, runtime service
-account, and public `run.invoker` for Insait (configurable).
-
-| Path | Role |
-|------|------|
-| [`terraform/`](terraform/) | All infrastructure definitions |
-| [`terraform/terraform.tfvars.example`](terraform/terraform.tfvars.example) | Copy to `terraform.tfvars` |
-| [`terraform/.terraform-version`](terraform/.terraform-version) | Terraform pin (tfenv / asdf / mise) |
-
-One-time project/billing notes: [`docs/gcp-project-setup.md`](../docs/gcp-project-setup.md).
+[`terraform/`](terraform/) owns the required APIs, the Artifact Registry repository, the
+Cloud Run v2 service (1 CPU, 512Mi, scale to zero, capped by `max_instances`), its runtime
+service account (Artifact Registry reader), and the public `run.invoker` binding Insait needs
+(`allow_unauthenticated`). [`cloudbuild.yaml`](../cloudbuild.yaml) builds the amd64 image;
+Terraform deploys it by git short SHA, so every deploy rolls a new revision.
 
 ## Prerequisites
 
-Install tools with **your** package manager or version manager; this repo only declares infra
-in Terraform.
+- A GCP project with billing linked and Owner on it (or editor, serviceusage.serviceUsageAdmin,
+  iam.serviceAccountAdmin, resourcemanager.projectIamAdmin, run.admin, artifactregistry.admin).
+- Google Cloud CLI and Terraform >= 1.5 ([`.terraform-version`](terraform/.terraform-version)).
+- On Linux aarch64 (for example Fedora in WSL on Windows ARM64), install gcloud from the
+  `google-cloud-cli-linux-arm.tar.gz` archive, not Windows gcloud shims on the WSL `PATH`.
+  Cloud Build builds amd64 remotely, so no local QEMU is needed.
 
-| Tool | Pin / notes |
-|------|-------------|
-| Google Cloud CLI | Auth + `gcloud auth configure-docker` |
-| Terraform | ≥ 1.5 — see [`.terraform-version`](terraform/.terraform-version) |
-| Docker + BuildKit | Image build/push — see [`docs/runbook-dev-environment.md`](../docs/runbook-dev-environment.md) |
-
-### Fedora 44 WSL (aarch64 — official tarball)
-
-COPR often returns **404 for `fedora-44`**; on this machine use the **linux-arm**
-tarball (native aarch64, not the Windows scoop shims on `PATH`):
-
-```bash
-cd /tmp
-curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz
-tar -xf google-cloud-cli-linux-arm.tar.gz
-./google-cloud-sdk/install.sh
-# install to $HOME/google-cloud-sdk; ensure ~/.bashrc sources path.bash.inc from $HOME, not /tmp
-gcloud components install docker-credential-gcr
-gcloud --version
-```
-
-Optional COPR on older Fedora releases: `sudo dnf copr enable @google-cloud-sdk/google-cloud-sdk`
-then `sudo dnf install google-cloud-cli`.
-
-Terraform on Fedora: `sudo dnf install terraform` when available, or
-[HashiCorp install docs](https://developer.hashicorp.com/terraform/install#linux).
-
-### GCP auth (once per machine)
+## One-time bootstrap
 
 ```bash
 gcloud auth login
+gcloud auth application-default login   # credentials for the Terraform provider
 gcloud config set project YOUR_PROJECT_ID
-gcloud auth application-default login
+gcloud services enable cloudbuild.googleapis.com compute.googleapis.com
+
+cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars   # set project_id
+terraform -chdir=infra/terraform init
+# The APIs and the Artifact Registry repository must exist before the first push.
+# image_tag is a required variable; this targeted apply does not use it.
+terraform -chdir=infra/terraform apply \
+  -target=google_artifact_registry_repository.app -var image_tag=bootstrap
 ```
 
-Application Default Credentials are what the Terraform Google provider uses.
+## Build and deploy
 
-## Configuration
+Commit first: Cloud Build uploads the working tree, and the tag should name what was built.
 
 ```bash
-cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
-# set project_id (region defaults to us-central1 in variables.tf)
+TAG="$(git rev-parse --short HEAD)"
+gcloud builds submit --region=us-central1 --config=cloudbuild.yaml --substitutions=_TAG="$TAG" .
+terraform -chdir=infra/terraform apply -var image_tag="$TAG"
 ```
 
-## Deploy
-
-### 1. Init and foundation (first time)
+The Dockerfile needs BuildKit (`RUN --mount`), so both build paths use `docker buildx`;
+legacy `docker build` and `gcloud builds submit --tag` fail. Local alternative (needs
+`gcloud auth configure-docker us-central1-docker.pkg.dev`, plus QEMU binfmt on aarch64):
 
 ```bash
-cd infra/terraform
-terraform init
+scripts/docker-build.sh --push \
+  "us-central1-docker.pkg.dev/YOUR_PROJECT_ID/onboarding-flow/onboarding-flow:$TAG"
 ```
 
-Apply APIs, Artifact Registry, and the Cloud Run runtime service account before the first
-image push:
+## Verify
 
 ```bash
-terraform apply -auto-approve \
-  -target='google_project_service.required["run.googleapis.com"]' \
-  -target='google_project_service.required["artifactregistry.googleapis.com"]' \
-  -target='google_project_service.required["iam.googleapis.com"]' \
-  -target='google_project_service.required["cloudresourcemanager.googleapis.com"]' \
-  -target=google_artifact_registry_repository.app \
-  -target=google_service_account.run \
-  -target=google_project_iam_member.run_ar_reader
+URL="$(terraform -chdir=infra/terraform output -raw cloud_run_url)"
+curl -fsS "$URL/health"   # {"status":"ok"}
+curl -sS "$URL/vehicle-info" -H 'Content-Type: application/json' \
+  -d '{"license_plate":"12345678"}'   # "success":true with the (Hebrew) vehicle fields
+terraform -chdir=infra/terraform output image   # deployed image tag
 ```
 
-### 2. Build and push image
+The current deployment is <https://onboarding-flow-2q2x6qga6a-uc.a.run.app>. The Insait API
+node uses `terraform -chdir=infra/terraform output -raw vehicle_info_url`.
 
-Set `container_image` in `terraform.tfvars` to the URI you will push (example below).
-From the **repository root**, build and push that same tag (no shell exports required):
+## Rollback
 
-The Dockerfile requires **BuildKit** (`--mount`). Use **`docker buildx`**, not legacy
-`docker build`. `gcloud builds submit --tag` alone uses the legacy builder and will fail.
-
-**Cloud Build (recommended on aarch64 WSL):** [`cloudbuild.yaml`](../cloudbuild.yaml) runs
-`docker buildx build` on amd64 workers:
+Every pushed SHA stays in Artifact Registry; redeploy an earlier one:
 
 ```bash
-# From repository root; _IMAGE must match container_image in terraform.tfvars
-gcloud config set project your-project-id
-gcloud services enable cloudbuild.googleapis.com compute.googleapis.com --quiet
-gcloud builds submit --region=us-central1 --config=cloudbuild.yaml \
-  --substitutions=_IMAGE=us-central1-docker.pkg.dev/your-project-id/onboarding-flow/onboarding-flow:latest .
+gcloud artifacts docker tags list \
+  us-central1-docker.pkg.dev/YOUR_PROJECT_ID/onboarding-flow/onboarding-flow
+terraform -chdir=infra/terraform apply -var image_tag=PREVIOUS_SHA
 ```
 
-After the first successful build, if push to Artifact Registry fails, grant the Cloud Build
-service account `roles/artifactregistry.writer` on the project (see troubleshooting).
-
-**Local buildx (push):** requires `docker-buildx` and, on ARM64, QEMU for `linux/amd64`:
+## Teardown
 
 ```bash
-sudo dnf install -y docker-buildx qemu-user-static
-docker run --rm --privileged tonistiigi/binfmt --install all
-gcloud auth configure-docker us-central1-docker.pkg.dev
-./scripts/docker-build.sh --push \
-  us-central1-docker.pkg.dev/your-project-id/onboarding-flow/onboarding-flow:latest
+terraform -chdir=infra/terraform destroy -var image_tag=unused
 ```
 
-Use your real `project_id` from `terraform.tfvars` in the paths above.
-
-### 3. Cloud Run + public invoker
-
-`container_image` is read from `terraform.tfvars`:
-
-```bash
-cd infra/terraform
-terraform apply -auto-approve
-```
-
-### Smoke test
-
-```bash
-curl -sS "$(terraform output -raw vehicle_info_url)" \
-  -H 'Content-Type: application/json' \
-  -d '{"license_plate":"12345678"}'
-```
-
-Use `terraform output -raw vehicle_info_url` as the Insait API node URL.
+This deletes the service, the repository with its images, and the service account; APIs stay
+enabled. The `YOUR_PROJECT_ID_cloudbuild` source bucket is not Terraform-managed; delete it,
+or the whole project with `gcloud projects delete YOUR_PROJECT_ID`.
 
 ## Troubleshooting
 
-- **`allUsers` invoker denied:** Set `allow_unauthenticated = false` in `terraform.tfvars` or use a
-  personal GCP project without that org constraint.
-- **WSL + Windows `gcloud` shims:** Use the Fedora COPR CLI inside WSL instead of Scoop shims on
-  UNC paths.
-- **`manifest type ... must support amd64/linux`:** Image was ARM-only. Rebuild for amd64, push,
-  then `terraform apply`.
-- **`--mount option requires BuildKit` / legacy builder deprecated:** Use
-  `gcloud builds submit --config=cloudbuild.yaml` or `./scripts/docker-build.sh`, not plain
-  `docker build` / `gcloud builds submit --tag`.
-- **`exec format error` during amd64 build on aarch64:** Install `qemu-user-static` + binfmt, or
-  use Cloud Build with `cloudbuild.yaml`.
-- **`gcloud builds submit` PERMISSION_DENIED** (even as Owner): enable **`compute.googleapis.com`**
-  (Cloud Build depends on it), use `--region=us-central1`, open
-  [Cloud Build](https://console.cloud.google.com/cloud-build) once to accept terms, then retry.
-  Do **not** use `sudo gcloud` (wrong PATH/credentials).
+- **`allUsers` invoker denied** (org policy such as domain-restricted sharing): use a personal
+  project, or set `allow_unauthenticated = false` (Insait would then need to authenticate).
+- **`gcloud builds submit` PERMISSION_DENIED**: confirm `compute.googleapis.com` is enabled,
+  pass `--region=us-central1`, and open the Cloud Build console once to accept its terms. If
+  the push fails, grant the build service account `roles/artifactregistry.writer`.
+- **`manifest type ... must support amd64/linux`**: the image was built for arm64. Rebuild
+  for `linux/amd64` (the default in `cloudbuild.yaml` and `scripts/docker-build.sh`).
+- **Changing `region`**: also pass `_REGION=<region>` to `gcloud builds submit`.

@@ -1,27 +1,21 @@
-# Cloud Build: BuildKit via buildx (required for Dockerfile cache/bind mounts).
-# Usage (repo root):
+# Build and push the amd64 image on Cloud Build (BuildKit via scripts/docker-build.sh).
+# From the repository root:
 #   gcloud builds submit --region=us-central1 --config=cloudbuild.yaml \
-#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/PROJECT/onboarding-flow/onboarding-flow:latest
+#     --substitutions=_TAG=$(git rev-parse --short HEAD) .
+# _TAG has no default: a fixed tag would be overwritten by every push, and
+# Terraform only rolls a new Cloud Run revision when the image reference changes.
 steps:
   - name: gcr.io/cloud-builders/docker
     entrypoint: bash
     args:
-      - -ceux
+      - -ceu
       - |
-        docker buildx version
-        docker buildx create --name cloudbuild --driver docker-container --use 2>/dev/null \
-          || docker buildx use cloudbuild
-        docker buildx inspect --bootstrap
-        docker buildx build \
-          --platform linux/amd64 \
-          --provenance=false \
-          --sbom=false \
-          --tag "${_IMAGE}" \
-          --push \
-          .
+        [[ -n "${_TAG}" ]] || { echo 'error: pass --substitutions=_TAG=$$(git rev-parse --short HEAD)' >&2; exit 1; }
+        bash scripts/docker-build.sh --push "${_REGION}-docker.pkg.dev/$PROJECT_ID/onboarding-flow/onboarding-flow:${_TAG}"
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _IMAGE: us-central1-docker.pkg.dev/encore-fde-yanai/onboarding-flow/onboarding-flow:latest
+  _REGION: us-central1
+  _TAG: ""
