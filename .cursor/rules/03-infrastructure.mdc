@@ -5,11 +5,14 @@ globs: ["Dockerfile", ".dockerignore"]
 # Deployment Standards
 
 ## 1. Containerization Strategy
-- **Minimal Footprint:** Utilize multi-stage Docker builds to ensure development tools do not leak into production images.
-- **Toolchain:** Use `ghcr.io/astral-sh/uv:latest` for deterministic, high-speed dependency resolution in the builder layer.
-- **Runtime Environment:** Standardize on `python:3.14-slim` for the final OCI image.
+- **BuildKit only:** Dockerfiles use `# syntax=docker/dockerfile:1` and BuildKit
+  features (`RUN --mount=type=cache`, bind mounts). Do not add legacy-builder
+  fallbacks. Local builds set `DOCKER_BUILDKIT=1`; require `docker buildx`.
+- **Minimal footprint:** Multi-stage builds; dev dependencies never in runtime.
+- **Toolchain:** `ghcr.io/astral-sh/uv:latest` in the builder stage.
+- **Runtime:** `python:3.14-slim`, unprivileged `appuser`.
 
 ## 2. Security & Execution
-- **Least Privilege:** The application must never run as root. Execute the process as an unprivileged `appuser`.
-- **Performance:** Compile Python bytecode during the build phase (`UV_COMPILE_BYTECODE=1`) to optimize cold-start times.
-- **Target:** Configured for Google Cloud Run (us-central1, unauthenticated access). Entrypoint must explicitly expose the Granian server on port 8080.
+- **Least privilege:** Process runs as `appuser`, not root.
+- **Performance:** `UV_COMPILE_BYTECODE=1` in builder; Granian ASGI on `$PORT`
+  (default 8080) for Cloud Run.

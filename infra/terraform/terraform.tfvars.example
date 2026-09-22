@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored) and fill in project_id + container_image.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Set before full apply; must match the image you build and push.
+container_image = "us-central1-docker.pkg.dev/your-gcp-project-id/onboarding-flow/onboarding-flow:latest"
