@@ -5,9 +5,7 @@ from functools import lru_cache
 from pydantic import Field, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_UPSTREAM_URL = (
-    "https://insurance-webhook-945894769129.us-central1.run.app/vehicle-info"
-)
+DEFAULT_UPSTREAM_URL = "https://insurance-webhook-945894769129.us-central1.run.app/vehicle-info"
 DEFAULT_UPSTREAM_TIMEOUT_SECONDS = 5.0
 
 

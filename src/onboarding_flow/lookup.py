@@ -2,28 +2,9 @@
 
 from dataclasses import dataclass
 
-from onboarding_flow.schemas import ErrorCode, VehicleData
-from onboarding_flow.upstream import (
-    UpstreamFailure,
-    UpstreamFailureKind,
-    UpstreamOutcome,
-    UpstreamPort,
-    UpstreamSuccess,
-)
-
-_FAILURE_MESSAGES: dict[UpstreamFailureKind, str] = {
-    UpstreamFailureKind.NOT_FOUND: "Vehicle not found.",
-    UpstreamFailureKind.TIMEOUT: "Vehicle lookup timed out. Please try again.",
-    UpstreamFailureKind.UNAVAILABLE: "Vehicle lookup is temporarily unavailable.",
-    UpstreamFailureKind.INVALID_RESPONSE: "Vehicle lookup returned an invalid response.",
-}
-
-_FAILURE_TO_ERROR: dict[UpstreamFailureKind, ErrorCode] = {
-    UpstreamFailureKind.NOT_FOUND: ErrorCode.VEHICLE_NOT_FOUND,
-    UpstreamFailureKind.TIMEOUT: ErrorCode.UPSTREAM_TIMEOUT,
-    UpstreamFailureKind.UNAVAILABLE: ErrorCode.UPSTREAM_UNAVAILABLE,
-    UpstreamFailureKind.INVALID_RESPONSE: ErrorCode.UPSTREAM_INVALID_RESPONSE,
-}
+from onboarding_flow.envelope import ErrorCode, vehicle_info_response
+from onboarding_flow.schemas import VehicleData
+from onboarding_flow.upstream import UpstreamOutcome, UpstreamPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,15 +24,17 @@ type LookupResult = LookupSuccess | LookupFailure
 
 
 def lookup_result_from_outcome(outcome: UpstreamOutcome) -> LookupResult:
-    match outcome:
-        case UpstreamSuccess(vehicle=vehicle):
-            return LookupSuccess(success=True, data=vehicle)
-        case UpstreamFailure(kind=kind):
-            return LookupFailure(
-                success=False,
-                error_code=_FAILURE_TO_ERROR[kind],
-                message=_FAILURE_MESSAGES[kind],
-            )
+    envelope = vehicle_info_response(outcome, trace_id="")
+    if envelope.success and envelope.data is not None:
+        return LookupSuccess(success=True, data=envelope.data)
+    if envelope.error_code is None or envelope.message is None:
+        msg = "upstream failure must map to error_code and message"
+        raise ValueError(msg)
+    return LookupFailure(
+        success=False,
+        error_code=envelope.error_code,
+        message=envelope.message,
+    )
 
 
 class VehicleLookup:

@@ -8,9 +8,7 @@ version = "0.1.0"
 description = "Encore AI Car Insurance Onboarding FDE Assignment"
 readme = "README.md"
 requires-python = ">=3.14"
-authors = [
-    { name = "Yanai Klugman", email = "me@yanai.sh" }
-]
+authors = [{ name = "Yanai Klugman", email = "me@yanai.sh" }]
 dependencies = [
     "granian>=2.8.3",
     "litestar>=2.24.0",
@@ -28,8 +26,41 @@ dev = [
     "ty>=0.0.83",
 ]
 
+[tool.uv]
+default-groups = ["dev"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "container: Docker image smoke tests under tests/integration (see scripts/check-image.sh)",
+]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src"]
+extend-exclude = [".agents"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+exclude = [".git", ".venv", "__pycache__", "build", "dist"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["onboarding_flow", "tests"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "pydantic.Field",
+    "litestar.params.Parameter",
+    "litestar.di.Provide",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false

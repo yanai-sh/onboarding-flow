@@ -1,5 +1,6 @@
 import pytest
 
+from onboarding_flow.envelope import ErrorCode
 from onboarding_flow.lookup import (
     LookupFailure,
     LookupSuccess,
@@ -7,7 +8,7 @@ from onboarding_flow.lookup import (
     lookup_result_from_outcome,
 )
 from onboarding_flow.memory_upstream import success_upstream
-from onboarding_flow.schemas import ErrorCode, VehicleData
+from onboarding_flow.schemas import VehicleData
 from onboarding_flow.upstream import UpstreamFailure, UpstreamFailureKind, UpstreamSuccess
 
 

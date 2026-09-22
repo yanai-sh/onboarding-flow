@@ -1,18 +1,8 @@
-"""Public request/response contracts for the vehicle lookup proxy."""
-
-from enum import StrEnum
+"""Inbound request and shared vehicle record types for the vehicle lookup proxy."""
 
 from pydantic import BaseModel, Field, field_validator
 
 MAX_LICENSE_PLATE_LENGTH = 32
-
-
-class ErrorCode(StrEnum):
-    INVALID_REQUEST = "INVALID_REQUEST"
-    VEHICLE_NOT_FOUND = "VEHICLE_NOT_FOUND"
-    UPSTREAM_TIMEOUT = "UPSTREAM_TIMEOUT"
-    UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
-    UPSTREAM_INVALID_RESPONSE = "UPSTREAM_INVALID_RESPONSE"
 
 
 class VehicleData(BaseModel):
@@ -47,39 +37,3 @@ class VehicleRequest(BaseModel):
             msg = "license plate must be ASCII alphanumeric"
             raise ValueError(msg)
         return normalized
-
-
-class APIResponse[T](BaseModel):
-    success: bool
-    data: T | None = None
-    error_code: ErrorCode | None = None
-    message: str | None = None
-    trace_id: str
-
-
-class VehicleInfoResponse(APIResponse[VehicleData]):
-    """Concrete envelope type for Litestar serialization."""
-
-
-def success_response(data: VehicleData, trace_id: str) -> VehicleInfoResponse:
-    return VehicleInfoResponse(
-        success=True,
-        data=data,
-        error_code=None,
-        message=None,
-        trace_id=trace_id,
-    )
-
-
-def error_response(
-    code: ErrorCode,
-    message: str,
-    trace_id: str,
-) -> VehicleInfoResponse:
-    return VehicleInfoResponse(
-        success=False,
-        data=None,
-        error_code=code,
-        message=message,
-        trace_id=trace_id,
-    )

@@ -1,27 +1,14 @@
 import pytest
-from pydantic import ValidationError
 
-from onboarding_flow.schemas import (
+from onboarding_flow.envelope import (
     ErrorCode,
-    VehicleData,
-    VehicleRequest,
     error_response,
     success_response,
+    vehicle_info_response,
 )
-
-
-def test_vehicle_request_normalizes_plate() -> None:
-    req = VehicleRequest(license_plate="  ab12cd34  ")
-    assert req.license_plate == "AB12CD34"
-
-
-@pytest.mark.parametrize(
-    "plate",
-    ["", "   ", "ab-cd", "plate with spaces", "a" * 33],
-)
-def test_vehicle_request_rejects_invalid_plates(plate: str) -> None:
-    with pytest.raises(ValidationError):
-        VehicleRequest(license_plate=plate)
+from onboarding_flow.schemas import VehicleData
+from onboarding_flow.upstream import UpstreamFailure, UpstreamFailureKind, UpstreamSuccess
+from tests.shared import ASSIGNMENT_SAMPLE_VEHICLE
 
 
 def test_success_envelope_shape() -> None:
@@ -72,3 +59,33 @@ def test_all_error_codes_exist() -> None:
         "UPSTREAM_INVALID_RESPONSE",
     }
     assert {code.value for code in ErrorCode} == expected
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected_code"),
+    [
+        (UpstreamFailureKind.NOT_FOUND, ErrorCode.VEHICLE_NOT_FOUND),
+        (UpstreamFailureKind.TIMEOUT, ErrorCode.UPSTREAM_TIMEOUT),
+        (UpstreamFailureKind.UNAVAILABLE, ErrorCode.UPSTREAM_UNAVAILABLE),
+        (UpstreamFailureKind.INVALID_RESPONSE, ErrorCode.UPSTREAM_INVALID_RESPONSE),
+    ],
+)
+def test_envelope_maps_upstream_failures(
+    kind: UpstreamFailureKind,
+    expected_code: ErrorCode,
+) -> None:
+    response = vehicle_info_response(UpstreamFailure(kind=kind), trace_id="trace-1")
+    assert response.success is False
+    assert response.error_code == expected_code
+    assert response.message
+    assert response.trace_id == "trace-1"
+
+
+def test_envelope_maps_upstream_success() -> None:
+    response = vehicle_info_response(
+        UpstreamSuccess(vehicle=ASSIGNMENT_SAMPLE_VEHICLE),
+        trace_id="trace-2",
+    )
+    assert response.success is True
+    assert response.data == ASSIGNMENT_SAMPLE_VEHICLE
+    assert response.trace_id == "trace-2"

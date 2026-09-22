@@ -4,14 +4,14 @@ import structlog
 from litestar import Controller, Request, post
 from litestar.status_codes import HTTP_200_OK
 
-from onboarding_flow.lookup import LookupFailure, LookupSuccess, VehicleLookup
-from onboarding_flow.observability import mask_plate, trace_id_from_request
-from onboarding_flow.schemas import (
+from onboarding_flow.envelope import (
     VehicleInfoResponse,
-    VehicleRequest,
     error_response,
     success_response,
 )
+from onboarding_flow.lookup import LookupFailure, LookupSuccess, VehicleLookup
+from onboarding_flow.observability import mask_plate, trace_id_from_request
+from onboarding_flow.schemas import VehicleRequest
 
 logger = structlog.get_logger()
 
