@@ -1,17 +1,71 @@
 """ASGI application assembly for the onboarding flow service."""
 
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
+
+import niquests
 from litestar import Litestar, get
+from litestar.openapi.config import OpenAPIConfig
+
+from onboarding_flow.config import get_settings
+from onboarding_flow.encore_upstream import EncoreUpstream
+from onboarding_flow.lookup import VehicleLookup
+from onboarding_flow.observability import TraceMiddleware
+from onboarding_flow.upstream import UpstreamPort
+from onboarding_flow.vehicle import VehicleController
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+OPENAPI_CONFIG = OpenAPIConfig(
+    title="Onboarding Flow Vehicle Proxy",
+    version="0.1.0",
+    description=(
+        "Resilient proxy for the Encore vehicle-info endpoint. "
+        "OpenAPI documents the Insait integration contract."
+    ),
+    path="/schema",
+)
 
 
-@get("/health")
+@get("/health", tags=["Health"], summary="Liveness probe")
 async def health() -> dict[str, str]:
     """Return the service liveness status."""
     return {"status": "ok"}
 
 
-def create_app() -> Litestar:
+def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
     """Return the configured application for tests and ASGI servers."""
-    return Litestar(route_handlers=[health])
+    injected_upstream = upstream
+
+    @asynccontextmanager
+    async def lifespan(app: Litestar) -> AsyncGenerator[None]:
+        if injected_upstream is not None:
+            app.state.lookup = VehicleLookup(injected_upstream)
+            yield
+            return
+
+        settings = get_settings()
+        session = niquests.AsyncSession()
+        try:
+            adapter = EncoreUpstream(
+                session,
+                settings.upstream_url,
+                settings.upstream_timeout_seconds,
+            )
+            app.state.lookup = VehicleLookup(adapter)
+            yield
+        finally:
+            await session.close()
+
+    return Litestar(
+        route_handlers=[health, VehicleController],
+        lifespan=[lifespan],
+        middleware=[TraceMiddleware()],
+        openapi_config=OPENAPI_CONFIG,
+    )
 
 
 app = create_app()
