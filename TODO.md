@@ -1,32 +1,54 @@
-# Actionable Tasks: Onboarding Flow Proxy
+# Implementation Checklist
 
-## Milestone 1: Core API & Anti-Corruption Layer
-- [x] **Initialize Package Layout (`src/onboarding_flow/__init__.py`)**
-- [ ] **Implement Schemas (`src/onboarding_flow/schemas.py`)**
-  - [ ] Define generic `APIResponse[T]` structure (`success`, `data`, `error_code`, `message`).
-  - [ ] Define `VehicleRequest` model for inbound payloads.
-  - [ ] Define `VehicleData` model for outbound/upstream data contracts.
-  - [ ] Implement a Pydantic `@field_validator` on license plate fields to enforce strict 7–8 character alphanumeric sanitization.
-- [ ] **Implement Async Client (`src/onboarding_flow/client.py`)**
-  - [ ] Instantiate an async `niquests` client targeting `https://insurance-webhook-945894769129.us-central1.run.app/vehicle-info`.
-  - [ ] Enforce a strict 5.0-second timeout constraint.
-  - [ ] Wrap execution in try/except blocks to catch timeouts, connection errors, and HTTP status codes, mapping them cleanly into `APIResponse`.
-- [ ] **Implement Litestar Controller & App (`src/onboarding_flow/app.py`)**
-  - [ ] Create a `VehicleController` exposing a `POST /vehicle-info` endpoint.
-  - [ ] Configure `structlog` middleware to extract or generate an `X-Trace-ID` for contextvar propagation.
-  - [ ] Implement inline PII masking for license plates in structured audit logs.
-  - [ ] Initialize the top-level Litestar application instance (`app`).
+The repository is still at the scaffold stage: only `/health` and its test are
+implemented. Complete the tickets in `ROADMAP.md` in order; keep the Insait
+items as a human handoff.
 
-## Milestone 2: Infrastructure & Packaging
-- [x] **Verify Toolchain Configurations**
-  - [x] Validate `pyproject.toml` dependencies and `ruff.toml` lint/format settings.
-- [x] **Generate Container Artifacts**
-  - [x] Write optimized multi-stage `Dockerfile` (Astral `uv` builder + `python:3.14-slim` runner).
-  - [x] Create `.dockerignore` targeting build caches, version control, and local documentation.
+## 1. Contract and lookup slice
 
-## Milestone 3: Insait Canvas Setup (Manual UI Task)
-- [ ] **Configure Conversational Nodes (N1–N6)**
-  - [ ] Map N1 (Greeting & Intent) and N2 (Data Collection via Natural Language).
-  - [ ] Connect N3 (Proxy Invocation), ensuring separate handling for `TIMEOUT` vs `NOT_FOUND` responses.
-  - [ ] Configure N4 (Summary & Confirmation) with state mutability loops for user edits.
-  - [ ] Finalize N5 (Payload Submission) and N6 (Completion & Policy Issuance).
+- [x] Add typed Pydantic models for `VehicleRequest`, `VehicleData`, error
+  codes, and generic `APIResponse[T]`.
+- [x] Normalize and validate non-empty ASCII alphanumeric plates with a
+  documented defensive maximum length; do not impose a country-specific
+  format.
+- [x] Define the vehicle lookup interface and inject it into the Litestar
+  controller.
+- [x] Implement the niquests adapter with the supplied URL, JSON POST, and
+  strict five-second timeout.
+- [x] Map not found, timeout, transport, upstream status, and invalid payload
+  failures to stable error codes and safe messages.
+- [x] Expose `POST /vehicle-info`; preserve `/health`.
+
+## 2. Boundary hardening
+
+- [x] Add trace-ID middleware for incoming or generated `X-Trace-ID` values.
+- [x] Bind and clear structlog context per request.
+- [x] Verify logs contain no raw plate, name, phone, or email values.
+- [x] Ensure expected upstream failures produce structured responses rather
+  than unhandled 5xx errors.
+
+## 3. Verification
+
+- [x] Test valid normalization and invalid request rejection.
+- [x] Test success, not found, timeout, connection failure, upstream 5xx, and
+  malformed upstream payloads through the adapter seam.
+- [x] Test controller routing and trace-ID propagation through Litestar's
+  public HTTP seam.
+- [ ] Test the real container startup and Cloud Run `$PORT` behavior if Docker
+  is available.
+- [x] Run `uv run ruff check .`, `uv run ruff format --check .`,
+  `uv run ty check .`, and `uv run pytest`.
+
+## 4. Manual Insait handoff
+
+- [ ] Human registers and obtains approved Insait access.
+- [ ] Create a Conversation Flow Agent, not a Single Prompt Agent.
+- [ ] Build the six-or-fewer-node flow described in `ARCHITECTURE.md`.
+- [ ] Configure deterministic API success/error and insurance-type branches.
+- [ ] Configure validation and correction loops for applicant details and the
+  summary.
+- [ ] Deploy the proxy to Cloud Run and connect the public endpoint.
+- [ ] Test happy path, invalid input, vehicle not found, timeout/unavailable,
+  correction, and Mandatory-without-add-ons paths in debug view.
+- [ ] Record the approximately three-minute end-to-end submission video and
+  capture workspace/agent/flow links.
