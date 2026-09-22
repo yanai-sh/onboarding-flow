@@ -1,6 +1,5 @@
 """Upstream vehicle lookup port and adapter outcome types."""
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
@@ -26,11 +25,6 @@ class UpstreamFailure:
 
 
 type UpstreamOutcome = UpstreamSuccess | UpstreamFailure
-
-
-class UpstreamAdapter(ABC):
-    @abstractmethod
-    async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome: ...
 
 
 class UpstreamPort(Protocol):

@@ -1,19 +1,13 @@
 """HTTP surface for vehicle lookup."""
 
-import structlog
 from litestar import Controller, Request, post
 from litestar.status_codes import HTTP_200_OK
 
-from onboarding_flow.envelope import (
-    VehicleInfoResponse,
-    error_response,
-    success_response,
-)
-from onboarding_flow.lookup import LookupFailure, LookupSuccess, VehicleLookup
-from onboarding_flow.observability import mask_plate, trace_id_from_request
+from onboarding_flow.envelope import VehicleInfoResponse
+from onboarding_flow.observability import trace_id_from_request
 from onboarding_flow.schemas import VehicleRequest
-
-logger = structlog.get_logger()
+from onboarding_flow.upstream import UpstreamPort
+from onboarding_flow.vehicle_lookup import lookup_vehicle_info
 
 
 class VehicleController(Controller):
@@ -35,23 +29,6 @@ class VehicleController(Controller):
         data: VehicleRequest,
         request: Request,
     ) -> VehicleInfoResponse:
-        lookup: VehicleLookup = request.app.state.lookup
+        upstream: UpstreamPort = request.app.state.upstream
         trace_id = trace_id_from_request(request)
-        result = await lookup.lookup(data.license_plate)
-
-        match result:
-            case LookupSuccess(data=vehicle):
-                logger.info(
-                    "vehicle_lookup_completed",
-                    success=True,
-                    plate_mask=mask_plate(data.license_plate),
-                )
-                return success_response(vehicle, trace_id)
-            case LookupFailure(error_code=error_code, message=message):
-                logger.info(
-                    "vehicle_lookup_completed",
-                    success=False,
-                    error_code=error_code.value,
-                    plate_mask=mask_plate(data.license_plate),
-                )
-                return error_response(error_code, message, trace_id)
+        return await lookup_vehicle_info(data.license_plate, upstream, trace_id)

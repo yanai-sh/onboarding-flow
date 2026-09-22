@@ -11,7 +11,6 @@ from litestar.openapi.config import OpenAPIConfig
 
 from onboarding_flow.config import get_settings
 from onboarding_flow.encore_upstream import EncoreUpstream
-from onboarding_flow.lookup import VehicleLookup
 from onboarding_flow.observability import TraceMiddleware
 from onboarding_flow.upstream import UpstreamPort
 from onboarding_flow.vehicle import VehicleController
@@ -43,19 +42,18 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
     @asynccontextmanager
     async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         if injected_upstream is not None:
-            app.state.lookup = VehicleLookup(injected_upstream)
+            app.state.upstream = injected_upstream
             yield
             return
 
         settings = get_settings()
         session = niquests.AsyncSession()
         try:
-            adapter = EncoreUpstream(
+            app.state.upstream = EncoreUpstream(
                 session,
                 settings.upstream_url,
                 settings.upstream_timeout_seconds,
             )
-            app.state.lookup = VehicleLookup(adapter)
             yield
         finally:
             await session.close()

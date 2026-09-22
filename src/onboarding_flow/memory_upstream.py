@@ -1,10 +1,7 @@
 """In-memory upstream adapter for tests."""
 
-from typing import override
-
 from onboarding_flow.schemas import VehicleData
 from onboarding_flow.upstream import (
-    UpstreamAdapter,
     UpstreamFailure,
     UpstreamFailureKind,
     UpstreamOutcome,
@@ -12,7 +9,7 @@ from onboarding_flow.upstream import (
 )
 
 
-class MemoryUpstream(UpstreamAdapter):
+class MemoryUpstream:
     """Returns a configured outcome or raises a configured exception."""
 
     def __init__(
@@ -26,7 +23,6 @@ class MemoryUpstream(UpstreamAdapter):
         self.call_count = 0
         self.last_plate: str | None = None
 
-    @override
     async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome:
         self.call_count += 1
         self.last_plate = license_plate

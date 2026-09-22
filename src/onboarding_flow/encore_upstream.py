@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, override
+from typing import Any
 
 import niquests
 from niquests.exceptions import ConnectionError as NiquestsConnectionError
@@ -12,7 +12,6 @@ from pydantic import ValidationError
 
 from onboarding_flow.schemas import VehicleData
 from onboarding_flow.upstream import (
-    UpstreamAdapter,
     UpstreamFailure,
     UpstreamFailureKind,
     UpstreamOutcome,
@@ -20,7 +19,7 @@ from onboarding_flow.upstream import (
 )
 
 
-class EncoreUpstream(UpstreamAdapter):
+class EncoreUpstream:
     def __init__(
         self,
         session: niquests.AsyncSession,
@@ -31,7 +30,6 @@ class EncoreUpstream(UpstreamAdapter):
         self._url = url
         self._timeout = timeout_seconds
 
-    @override
     async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome:
         try:
             response = await self._session.post(
