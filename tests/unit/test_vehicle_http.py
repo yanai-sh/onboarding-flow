@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Any
@@ -119,6 +120,8 @@ def test_unhandled_upstream_exception_logs_error_with_trace_id(
     assert errors[0]["message"] == "request_failed"
     assert errors[0]["trace_id"] == "client-trace-500"
     assert "RuntimeError: adapter exploded" in errors[0]["stack_trace"]
+    # The request body (and therefore the plate) is never part of the traceback payload.
+    assert assignment_plate not in json.dumps(json_logs)
 
 
 def test_invalid_plate_does_not_log_error(

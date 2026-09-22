@@ -4,7 +4,7 @@ import logging
 import time
 
 from onboarding_flow.envelope import VehicleInfoResponse, vehicle_info_response
-from onboarding_flow.observability import mask_plate
+from onboarding_flow.observability import elapsed_ms, mask_plate
 from onboarding_flow.schemas import LicensePlate, TraceId
 from onboarding_flow.upstream import UpstreamPort
 
@@ -18,7 +18,7 @@ async def lookup_vehicle_info(
 ) -> VehicleInfoResponse:
     started = time.perf_counter()
     outcome = await upstream.fetch_vehicle(license_plate)
-    duration_ms = round((time.perf_counter() - started) * 1000, 1)
+    duration_ms = elapsed_ms(started)
     response = vehicle_info_response(outcome, trace_id)
 
     logger.info(

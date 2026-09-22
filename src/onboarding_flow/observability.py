@@ -1,6 +1,7 @@
 """Request trace correlation and PII-safe logging helpers."""
 
 import logging
+import time
 from typing import TYPE_CHECKING, override
 
 from litestar.enums import ScopeType
@@ -18,6 +19,11 @@ if TYPE_CHECKING:
 TRACE_HEADER = "X-Trace-ID"
 
 logger = logging.getLogger(__name__)
+
+
+def elapsed_ms(started: float) -> float:
+    """Milliseconds since a ``time.perf_counter()`` reading, rounded for log fields."""
+    return round((time.perf_counter() - started) * 1000, 1)
 
 
 def mask_plate(license_plate: LicensePlate) -> str:
