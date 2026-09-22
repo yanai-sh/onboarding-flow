@@ -1,9 +1,6 @@
 """Production upstream adapter using niquests."""
 
-from __future__ import annotations
-
 import json
-from typing import Any
 
 import niquests
 from niquests.exceptions import ConnectionError as NiquestsConnectionError
@@ -17,6 +14,20 @@ from onboarding_flow.upstream import (
     UpstreamOutcome,
     UpstreamSuccess,
 )
+
+
+def _outcome_from_upstream_body(body: object) -> UpstreamOutcome:
+    match body:
+        case {"success": True, "data": dict() as data}:
+            try:
+                vehicle = VehicleData.model_validate(data)
+            except ValidationError:
+                return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
+            return UpstreamSuccess(vehicle=vehicle)
+        case {"success": False}:
+            return UpstreamFailure(kind=UpstreamFailureKind.NOT_FOUND)
+        case _:
+            return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
 
 
 class EncoreUpstream:
@@ -52,26 +63,10 @@ class EncoreUpstream:
             case code if code >= 500:
                 return UpstreamFailure(kind=UpstreamFailureKind.UNAVAILABLE)
             case 200:
-                pass
+                try:
+                    body = response.json()
+                except json.JSONDecodeError, ValueError:
+                    return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
+                return _outcome_from_upstream_body(body)
             case _:
                 return UpstreamFailure(kind=UpstreamFailureKind.UNAVAILABLE)
-
-        try:
-            body: Any = response.json()
-        except json.JSONDecodeError, ValueError:
-            return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
-
-        if not isinstance(body, dict):
-            return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
-
-        if body.get("success") is True and isinstance(body.get("data"), dict):
-            try:
-                vehicle = VehicleData.model_validate(body["data"])
-            except ValidationError:
-                return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)
-            return UpstreamSuccess(vehicle=vehicle)
-
-        if body.get("success") is False:
-            return UpstreamFailure(kind=UpstreamFailureKind.NOT_FOUND)
-
-        return UpstreamFailure(kind=UpstreamFailureKind.INVALID_RESPONSE)

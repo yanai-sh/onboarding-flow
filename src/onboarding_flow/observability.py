@@ -1,7 +1,5 @@
 """Request trace correlation and PII-safe logging helpers."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, override
 
 import structlog
@@ -10,6 +8,7 @@ from litestar.middleware.base import ASGIMiddleware
 from litestar.types import ASGIApp, Message, Receive, Scope, Send
 
 from onboarding_flow.schemas import LicensePlate, TraceId, parse_trace_id
+from onboarding_flow.state import trace_id_from_state
 
 if TYPE_CHECKING:
     from litestar import Request
@@ -51,15 +50,15 @@ class TraceMiddleware(ASGIMiddleware):
         encoded_trace = trace_id.encode()
 
         async def send_wrapper(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                start = message
-                headers = list(start.get("headers", []))
-                if not any(header[0].lower() == b"x-trace-id" for header in headers):
-                    headers.append((b"x-trace-id", encoded_trace))
-                start["headers"] = headers
-                await send(start)
-                return
-            await send(message)
+            match message:
+                case {"type": "http.response.start"}:
+                    headers = list(message.get("headers", []))
+                    if not any(header[0].lower() == b"x-trace-id" for header in headers):
+                        headers.append((b"x-trace-id", encoded_trace))
+                    message["headers"] = headers
+                    await send(message)
+                case _:
+                    await send(message)
 
         try:
             await next_app(scope, receive, send_wrapper)
@@ -69,11 +68,7 @@ class TraceMiddleware(ASGIMiddleware):
 
 def trace_id_from_request(request: Request) -> TraceId:
     """Return the trace id bound by TraceMiddleware; do not mint a new id here."""
-    trace_id = getattr(request.state, "trace_id", None)
-    if not trace_id:
-        msg = "trace_id missing; TraceMiddleware must run before handlers"
-        raise RuntimeError(msg)
-    return trace_id
+    return trace_id_from_state(request.state)
 
 
 def trace_id_for_request(request: Request) -> TraceId:

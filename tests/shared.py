@@ -1,7 +1,5 @@
 """Test-only helpers and literals shared across pytest modules."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess

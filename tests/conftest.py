@@ -1,7 +1,5 @@
 """Shared pytest fixtures for unit and integration tests."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from typing import TYPE_CHECKING

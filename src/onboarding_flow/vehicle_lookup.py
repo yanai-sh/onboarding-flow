@@ -21,7 +21,7 @@ async def lookup_vehicle_info(
     logger.info(
         "vehicle_lookup_completed",
         success=response.success,
-        error_code=response.error_code.value if response.error_code else None,
+        error_code=response.error_code,
         plate_mask=mask_plate(license_plate),
     )
     return response

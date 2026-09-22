@@ -1,9 +1,7 @@
 """ASGI application assembly for the onboarding flow service."""
 
-from __future__ import annotations
-
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
 
 import niquests
 from litestar import Litestar, get
@@ -14,9 +12,6 @@ from onboarding_flow.encore_upstream import EncoreUpstream
 from onboarding_flow.observability import TraceMiddleware
 from onboarding_flow.upstream import UpstreamPort
 from onboarding_flow.vehicle import VehicleController
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
 
 OPENAPI_CONFIG = OpenAPIConfig(
     title="Onboarding Flow Vehicle Proxy",

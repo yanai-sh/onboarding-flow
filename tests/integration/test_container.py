@@ -1,12 +1,12 @@
 """Docker image smoke test: build OCI image and verify /health on PORT."""
 
-from __future__ import annotations
-
+import json
 import subprocess
 import time
 
 import niquests
 import pytest
+from niquests.exceptions import RequestException
 
 pytestmark = pytest.mark.container
 
@@ -40,7 +40,7 @@ def test_container_serves_health_on_port_8080(built_image: str) -> None:
                 response = niquests.get(health_url, timeout=2)
                 if response.status_code == 200 and response.json() == {"status": "ok"}:
                     return
-            except Exception as exc:
+            except (RequestException, json.JSONDecodeError, TypeError, ValueError) as exc:
                 last_error = exc
             time.sleep(0.5)
         msg = f"Container health check failed: {last_error}"

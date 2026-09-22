@@ -6,7 +6,7 @@ from litestar.status_codes import HTTP_200_OK
 from onboarding_flow.envelope import VehicleInfoResponse
 from onboarding_flow.observability import trace_id_from_request
 from onboarding_flow.schemas import VehicleRequest
-from onboarding_flow.upstream import UpstreamPort
+from onboarding_flow.state import upstream_from_app
 from onboarding_flow.vehicle_lookup import lookup_vehicle_info
 
 
@@ -29,6 +29,6 @@ class VehicleController(Controller):
         data: VehicleRequest,
         request: Request,
     ) -> VehicleInfoResponse:
-        upstream: UpstreamPort = request.app.state.upstream
+        upstream = upstream_from_app(request.app.state)
         trace_id = trace_id_from_request(request)
         return await lookup_vehicle_info(data.license_plate, upstream, trace_id)

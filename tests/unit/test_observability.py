@@ -15,25 +15,25 @@ def test_mask_plate_short_values() -> None:
     assert mask_plate("AB") == "****"
 
 
-def test_parse_trace_id_generates_when_header_missing() -> None:
+def test_parse_trace_id_generates_uuid7_when_header_missing() -> None:
     trace = parse_trace_id(None)
-    uuid.UUID(trace)
+    assert uuid.UUID(trace).version == 7
 
 
-def test_parse_trace_id_generates_when_header_blank() -> None:
+def test_parse_trace_id_generates_uuid7_when_header_blank() -> None:
     trace = parse_trace_id("   ")
-    uuid.UUID(trace)
+    assert uuid.UUID(trace).version == 7
 
 
 def test_parse_trace_id_accepts_valid_client_value() -> None:
     assert parse_trace_id("client-trace-99") == "client-trace-99"
 
 
-def test_parse_trace_id_replaces_invalid_header_with_uuid() -> None:
+def test_parse_trace_id_replaces_invalid_header_with_uuid7() -> None:
     invalid = "x" * 200
     trace = parse_trace_id(invalid)
     assert trace != invalid
-    uuid.UUID(trace)
+    assert uuid.UUID(trace).version == 7
 
 
 def test_trace_id_from_request_requires_middleware_state() -> None:

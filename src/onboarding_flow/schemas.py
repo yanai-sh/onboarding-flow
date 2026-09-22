@@ -1,7 +1,5 @@
 """Inbound request and shared vehicle record types for the vehicle lookup proxy."""
 
-from __future__ import annotations
-
 import uuid
 from typing import Annotated
 
@@ -47,15 +45,19 @@ TraceId = Annotated[
 _trace_id_adapter = TypeAdapter(TraceId)
 
 
+def _new_trace_id() -> TraceId:
+    return _trace_id_adapter.validate_python(str(uuid.uuid7()))
+
+
 def parse_trace_id(header_value: str | None) -> TraceId:
     """Resolve trace id from X-Trace-ID; invalid client values are replaced with a new UUID."""
     if not header_value or not header_value.strip():
-        return _trace_id_adapter.validate_python(str(uuid.uuid4()))
+        return _new_trace_id()
     stripped = header_value.strip()
     try:
         return _trace_id_adapter.validate_python(stripped)
     except ValidationError:
-        return _trace_id_adapter.validate_python(str(uuid.uuid4()))
+        return _new_trace_id()
 
 
 def _strip_vehicle_text(value: str) -> str:

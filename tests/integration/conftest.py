@@ -1,7 +1,5 @@
 """Fixtures and CLI options for Docker image smoke tests."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 from pathlib import Path
