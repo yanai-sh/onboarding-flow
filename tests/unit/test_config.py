@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
+from pydantic import ValidationError
 
 from onboarding_flow.config import (
     DEFAULT_UPSTREAM_TIMEOUT_SECONDS,
@@ -34,6 +35,12 @@ def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = get_settings()
     assert str(settings.upstream_url) == "https://example.test/vehicle-info"
     assert settings.upstream_timeout_seconds == 2.5
+
+
+def test_settings_rejects_invalid_upstream_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UPSTREAM_URL", "not-a-url")
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 def test_legacy_config_helpers_use_cached_settings(

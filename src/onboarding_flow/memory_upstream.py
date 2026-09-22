@@ -1,6 +1,6 @@
 """In-memory upstream adapter for tests."""
 
-from onboarding_flow.schemas import VehicleData
+from onboarding_flow.schemas import LicensePlate, VehicleData
 from onboarding_flow.upstream import (
     UpstreamFailure,
     UpstreamFailureKind,
@@ -21,9 +21,9 @@ class MemoryUpstream:
         self._outcome = outcome
         self._exc = exc
         self.call_count = 0
-        self.last_plate: str | None = None
+        self.last_plate: LicensePlate | None = None
 
-    async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome:
+    async def fetch_vehicle(self, license_plate: LicensePlate) -> UpstreamOutcome:
         self.call_count += 1
         self.last_plate = license_plate
         if self._exc is not None:

@@ -8,9 +8,9 @@ from typing import Any
 import niquests
 from niquests.exceptions import ConnectionError as NiquestsConnectionError
 from niquests.exceptions import Timeout as NiquestsTimeout
-from pydantic import ValidationError
+from pydantic import HttpUrl, ValidationError
 
-from onboarding_flow.schemas import VehicleData
+from onboarding_flow.schemas import LicensePlate, VehicleData
 from onboarding_flow.upstream import (
     UpstreamFailure,
     UpstreamFailureKind,
@@ -23,14 +23,14 @@ class EncoreUpstream:
     def __init__(
         self,
         session: niquests.AsyncSession,
-        url: str,
+        url: HttpUrl | str,
         timeout_seconds: float,
     ) -> None:
         self._session = session
-        self._url = url
+        self._url = str(url)
         self._timeout = timeout_seconds
 
-    async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome:
+    async def fetch_vehicle(self, license_plate: LicensePlate) -> UpstreamOutcome:
         try:
             response = await self._session.post(
                 self._url,

@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from onboarding_flow.schemas import VehicleData
+from onboarding_flow.schemas import TraceId, VehicleData
 from onboarding_flow.upstream import (
     UpstreamFailure,
     UpstreamFailureKind,
@@ -32,14 +32,14 @@ class APIResponse[T](BaseModel):
     data: T | None = None
     error_code: ErrorCode | None = None
     message: str | None = None
-    trace_id: str
+    trace_id: TraceId
 
 
 class VehicleInfoResponse(APIResponse[VehicleData]):
     """Concrete envelope type for Litestar serialization."""
 
 
-def success_response(data: VehicleData, trace_id: str) -> VehicleInfoResponse:
+def success_response(data: VehicleData, trace_id: TraceId) -> VehicleInfoResponse:
     return VehicleInfoResponse(
         success=True,
         data=data,
@@ -52,7 +52,7 @@ def success_response(data: VehicleData, trace_id: str) -> VehicleInfoResponse:
 def error_response(
     code: ErrorCode,
     message: str,
-    trace_id: str,
+    trace_id: TraceId,
 ) -> VehicleInfoResponse:
     return VehicleInfoResponse(
         success=False,
@@ -78,7 +78,7 @@ _FAILURE_TO_ERROR: dict[UpstreamFailureKind, ErrorCode] = {
 }
 
 
-def vehicle_info_response(outcome: UpstreamOutcome, trace_id: str) -> VehicleInfoResponse:
+def vehicle_info_response(outcome: UpstreamOutcome, trace_id: TraceId) -> VehicleInfoResponse:
     match outcome:
         case UpstreamSuccess(vehicle=vehicle):
             return success_response(vehicle, trace_id)

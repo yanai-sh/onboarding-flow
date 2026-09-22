@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from onboarding_flow.schemas import VehicleData
+from onboarding_flow.schemas import LicensePlate, VehicleData
 
 
 class UpstreamFailureKind(StrEnum):
@@ -28,4 +28,4 @@ type UpstreamOutcome = UpstreamSuccess | UpstreamFailure
 
 
 class UpstreamPort(Protocol):
-    async def fetch_vehicle(self, license_plate: str) -> UpstreamOutcome: ...
+    async def fetch_vehicle(self, license_plate: LicensePlate) -> UpstreamOutcome: ...

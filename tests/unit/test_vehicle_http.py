@@ -81,3 +81,21 @@ def test_trace_id_generated_when_missing(
     trace = response.json()["trace_id"]
     assert trace
     assert response.headers.get("x-trace-id") == trace
+
+
+def test_trace_id_invalid_header_is_replaced(
+    api_client: TestClient,
+    assignment_plate: str,
+) -> None:
+    invalid = "x" * 129
+    response = api_client.post(
+        "/vehicle-info",
+        json={"license_plate": assignment_plate},
+        headers={"X-Trace-ID": invalid},
+    )
+
+    assert response.status_code == 200
+    trace = response.json()["trace_id"]
+    assert trace != invalid
+    assert len(trace) <= 128
+    assert response.headers.get("x-trace-id") == trace

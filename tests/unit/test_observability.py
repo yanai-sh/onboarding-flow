@@ -1,7 +1,10 @@
-from litestar import Litestar, Request, get
-from litestar.testing import TestClient
+import uuid
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-from onboarding_flow.observability import TraceMiddleware, mask_plate, trace_id_for_request
+import pytest
+
+from onboarding_flow.observability import mask_plate, parse_trace_id, trace_id_from_request
 
 
 def test_mask_plate_hides_prefix() -> None:
@@ -12,27 +15,35 @@ def test_mask_plate_short_values() -> None:
     assert mask_plate("AB") == "****"
 
 
-@get("/trace")
-async def trace_probe(request: Request) -> dict[str, str]:
-    return {"trace_id": trace_id_for_request(request)}
+def test_parse_trace_id_generates_when_header_missing() -> None:
+    trace = parse_trace_id(None)
+    uuid.UUID(trace)
 
 
-def test_trace_middleware_echoes_provided_header() -> None:
-    app = Litestar(route_handlers=[trace_probe], middleware=[TraceMiddleware()])
-    with TestClient(app=app) as client:
-        response = client.get("/trace", headers={"X-Trace-ID": "client-trace-42"})
-
-    assert response.status_code == 200
-    assert response.json()["trace_id"] == "client-trace-42"
-    assert response.headers.get("x-trace-id") == "client-trace-42"
+def test_parse_trace_id_generates_when_header_blank() -> None:
+    trace = parse_trace_id("   ")
+    uuid.UUID(trace)
 
 
-def test_trace_middleware_generates_id_when_header_missing() -> None:
-    app = Litestar(route_handlers=[trace_probe], middleware=[TraceMiddleware()])
-    with TestClient(app=app) as client:
-        response = client.get("/trace")
+def test_parse_trace_id_accepts_valid_client_value() -> None:
+    assert parse_trace_id("client-trace-99") == "client-trace-99"
 
-    assert response.status_code == 200
-    trace = response.json()["trace_id"]
-    assert trace
-    assert response.headers.get("x-trace-id") == trace
+
+def test_parse_trace_id_replaces_invalid_header_with_uuid() -> None:
+    invalid = "x" * 200
+    trace = parse_trace_id(invalid)
+    assert trace != invalid
+    uuid.UUID(trace)
+
+
+def test_trace_id_from_request_requires_middleware_state() -> None:
+    request = MagicMock()
+    request.state = SimpleNamespace()
+    with pytest.raises(RuntimeError, match="TraceMiddleware"):
+        trace_id_from_request(request)
+
+
+def test_trace_id_from_request_returns_bound_value() -> None:
+    request = MagicMock()
+    request.state = SimpleNamespace(trace_id="bound-trace")
+    assert trace_id_from_request(request) == "bound-trace"

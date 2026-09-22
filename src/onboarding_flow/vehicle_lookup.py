@@ -4,15 +4,16 @@ import structlog
 
 from onboarding_flow.envelope import VehicleInfoResponse, vehicle_info_response
 from onboarding_flow.observability import mask_plate
+from onboarding_flow.schemas import LicensePlate, TraceId
 from onboarding_flow.upstream import UpstreamPort
 
 logger = structlog.get_logger()
 
 
 async def lookup_vehicle_info(
-    license_plate: str,
+    license_plate: LicensePlate,
     upstream: UpstreamPort,
-    trace_id: str,
+    trace_id: TraceId,
 ) -> VehicleInfoResponse:
     outcome = await upstream.fetch_vehicle(license_plate)
     response = vehicle_info_response(outcome, trace_id)
