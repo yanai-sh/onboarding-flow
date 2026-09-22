@@ -9,17 +9,19 @@ globs: "**/*.py"
 - Python 3.14 · Litestar controllers · Pydantic v2 · `pydantic-settings`
 - Outbound: process-scoped `httpx.AsyncClient` in lifespan (ADR 0002)
 - Serve: Granian ASGI via `GRANIAN_*` image env — interface `asgi`, not `asginl`
-- Logs: stdlib JSON via `onboarding_flow.logging_config`; `extra=` fields only
+- Logs: stdlib JSON via `onboarding_flow.observability`; `extra=` fields only
 - Absolute imports only (`ban-relative-imports`)
 
 ## Seams to respect
 
-- `UpstreamPort` on `app.state`; tests inject `MemoryUpstream` (or fakes) — never
-  hit the real Encore URL in unit tests.
-- `VehicleRequest` / `LicensePlate` at ingress; shared plate rules on success
-  parse. Invalid ingress → 4xx (ADR 0001).
-- Envelope: `APIResponse[T]` / `VehicleInfoResponse`; map `UpstreamOutcome` in
-  `envelope.py`. Do not mint `trace_id` in handlers — read via observability.
+- `UpstreamPort` on `app.state`; tests inject `tests/fakes.py::MemoryUpstream`
+  (or `httpx.MockTransport`) — never hit the real Encore URL in unit tests.
+- `VehicleRequest` checks structure only; the handler applies
+  `normalize_license_plate`, and a rule failure is an envelope outcome, not a
+  4xx (ADR 0003). The same plate rule validates upstream success payloads.
+- Envelope: flat `VehicleInfoResponse`; `vehicle.py` maps `UpstreamOutcome` and
+  owns the speakable `MESSAGES`. Do not mint `trace_id` in handlers — read
+  `request.state.trace_id`.
 - Settings: `UPSTREAM_URL`, `UPSTREAM_TIMEOUT_SECONDS`, `LOG_LEVEL` only.
 
 ## Observability and PII

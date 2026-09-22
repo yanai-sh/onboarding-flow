@@ -2,53 +2,41 @@
 
 ## Project intent
 
-This repository is a focused solo take-home assignment for a car-insurance
-onboarding flow. Prefer a small, explainable implementation that demonstrates
-production judgment over novelty or speculative infrastructure. Read
-`CONTEXT.md`, `ARCHITECTURE.md`, `ROADMAP.md`, and `TODO.md` before changing
-application behavior; they define the assignment-specific scope and contracts.
+A solo take-home for a car-insurance onboarding flow, with two deliverables:
 
-The system has two deliverables:
+1. A stateless proxy for the supplied vehicle-info endpoint (this repository, deployed on
+   Cloud Run).
+2. An Insait Conversation Flow Agent that calls the proxy. It is built by hand in the Insait UI.
 
-1. A resilient API proxy for the supplied vehicle-info endpoint.
-2. A manually configured Insait Conversation Flow Agent using that API.
+The proxy is shipped. Prefer small, explainable changes that protect its contract over new
+features. Before changing behavior, read `ARCHITECTURE.md` (contract, seams, log events),
+`CONTEXT.md` (vocabulary), and the ADRs under `docs/adr/`; an ADR wins on a disputed contract.
 
-Keep the boundary between code the agent can change and actions that require
-the Insait UI, account access, or a recorded submission explicit.
+## Contract invariants
 
-## Agent skills
+- Every lookup outcome, including a plate that breaks the rule, returns HTTP 200 with
+  `success` and a stable `error_code`. Only structurally malformed requests get a framework
+  400 ([ADR 0003](docs/adr/0003-invalid-plate-in-envelope.md)). A change to this split needs a
+  new ADR.
+- The plate rule is 7 or 8 ASCII digits after removing spaces, `-`, and `.`. It lives in
+  `schemas.py` and applies to both the request and the upstream success body.
+- One bounded upstream call per lookup, with a total timeout and no retries.
+- One HTTP stack (`httpx`) and one stdlib JSON logging pipeline
+  ([ADR 0002](docs/adr/0002-httpx-stdlib-logging-granian-env.md)). Log only the events in
+  `ARCHITECTURE.md`; plates appear only masked, and bodies or contact details never appear.
+- Out of scope: auth, caching, persistence, pricing, OpenTelemetry, and HTTP/3.
 
-For implementation, use the local `tdd`, `codebase-design`, and `implement`
-skills together: agree on public seams, build tracer-bullet behavior, and
-verify it through the highest public interface. Use `writing-for-agents` when
-changing this file or other agent-facing documentation. The Insait flow is a
-manual platform step; document its handoff and never imply that repository
-code automated the Insait UI.
+## Manual Insait boundary
 
-### Issue tracker
+The flow's design and test record live in `docs/insait-flow.md`. When a task touches the flow,
+edit that document and describe the UI steps for a human. State platform actions as done only
+when the user has confirmed them; repository code never configures the Insait platform.
 
-Planning artifacts use local Markdown under `.scratch/<feature>/`. The
-directory is intentionally git-ignored. See `docs/agents/issue-tracker.md`.
+## Checks
 
-### Triage labels
-
-Use `inbox`, `needs-clarification`, `ready-to-build`,
-`manual-platform-step`, and `out-of-scope` in local planning notes. See
-`docs/agents/triage-labels.md`.
-
-### Domain docs
-
-This is a single-context repository. Read `CONTEXT.md` and relevant decisions
-under `docs/adr/` when they exist. See `docs/agents/domain.md`.
-
-## Working agreements
-
-- Read the assignment and relevant repository docs before changing behavior.
-- Keep external failures inside typed, structured API responses.
-- Add or update tests with behavior changes.
-- Keep Insait-specific manual steps documented rather than pretending they are
-  automated.
-- Run the repository checks proportionally before handing work back:
-  `./scripts/check.sh` (or the individual ruff, ty, and pytest commands).
-- Do not create remote labels, tags, branches, tickets, commits, or releases
-  unless the user explicitly requests them.
+- App changes: `./scripts/check.sh` (ruff, ty, unit tests). Update tests with behavior changes,
+  at the HTTP or `UpstreamPort` seam; unit tests never call the real upstream.
+- Dockerfile or runtime environment changes: also `./scripts/check-image.sh` (needs Docker
+  with buildx).
+- Deploys follow `infra/README.md`.
+- Create commits, branches, tags, remotes, or releases only when the user asks.

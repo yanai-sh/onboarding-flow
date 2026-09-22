@@ -6,9 +6,9 @@ alwaysApply: true
 
 ## Phase and scope
 
-Part A (proxy + packaging) is **complete**. Prefer protecting the shipped contract
-over new features. Remaining assignment work is Phase 4: deploy + manual Insait
-handoff (`ROADMAP.md`, `TODO.md` §4). Read `CONTEXT.md` and `ARCHITECTURE.md`
+Part A (proxy + packaging + Cloud Run deploy) is **complete**. Prefer protecting
+the shipped contract over new features. Remaining assignment work is the manual
+Insait flow (`docs/insait-flow.md`). Read `CONTEXT.md` and `ARCHITECTURE.md`
 before changing behavior; ADRs under `docs/adr/` win on disputed contracts.
 
 Out of scope (do not add): retries, caching, auth, persistence, pricing, OTEL,
@@ -24,6 +24,7 @@ semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
 
 - Upstream and adapter failures → typed `VehicleInfoResponse` on **HTTP 200**
   (`success` / `error_code`). Never unmapped 5xx from expected upstream faults.
-- Proxy ingress validation → framework **4xx** (ADR 0001). Do not invent a
-  second path that returns `INVALID_REQUEST` in the envelope without an ADR.
+- A plate that breaks the 7–8 digit rule (or that upstream rejects) → HTTP 200
+  `INVALID_REQUEST`; only structural faults (malformed JSON, missing field,
+  wrong type) → framework **400** (ADR 0003). Changing that split needs an ADR.
 - No automatic retries; keep the user-facing path bounded.

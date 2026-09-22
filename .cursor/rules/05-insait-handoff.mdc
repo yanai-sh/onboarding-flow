@@ -2,14 +2,12 @@
 description: Manual Insait Conversation Flow handoff; do not automate the platform UI.
 globs:
   - ARCHITECTURE.md
-  - TODO.md
-  - ROADMAP.md
   - CONTEXT.md
   - README.md
   - docs/**/*.md
   - infra/README.md
 ---
-# Insait Handoff (Phase 4)
+# Insait Handoff (Part B)
 
 ## Ownership
 
@@ -19,18 +17,19 @@ Never imply that repo code or scripts automated the Insait UI.
 
 ## Document, don't invent
 
-- Flow shape and branching: `ARCHITECTURE.md` (≤6 nodes, no Collect Node).
-- Checklist and evidence: `TODO.md` §4; phase status: `ROADMAP.md`.
+- Flow shape, node types, and test record: `docs/insait-flow.md` (≤7 nodes
+  including End, dedicated API node, no Collect Node).
+- Submission placeholders (workspace, agent, flow link, video): `README.md`.
 - Deploy URL for Insait: Cloud Run via `infra/README.md` after Terraform apply.
 - OpenAPI for integration: `/schema/openapi.json` (Swagger at `/schema/swagger`).
 
 ## Client contract reminders
 
 - Happy path and upstream faults: HTTP **200** + `success` / `error_code`.
-- Bad plates at the proxy: HTTP **4xx** (ADR 0001) — Insait should pre-validate
-  and/or branch on client errors; do not "fix" docs to claim envelope-only errors.
-- Error codes for routing: `VEHICLE_NOT_FOUND`, `UPSTREAM_TIMEOUT`,
-  `UPSTREAM_UNAVAILABLE`, `UPSTREAM_INVALID_RESPONSE` (+ reserved `INVALID_REQUEST`).
+- Bad plates: HTTP **200** `INVALID_REQUEST` (ADR 0003); only malformed bodies
+  are a framework 400, which the API node's error port covers.
+- Error codes for routing: `INVALID_REQUEST`, `VEHICLE_NOT_FOUND`,
+  `UPSTREAM_TIMEOUT`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_INVALID_RESPONSE`.
 
 ## Agent behavior
 

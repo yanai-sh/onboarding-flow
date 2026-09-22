@@ -24,6 +24,8 @@ globs:
 ## Terraform / Cloud Run
 
 - Declarative stack lives under `infra/terraform/`; follow `infra/README.md`.
+- Images are tagged with the git short SHA (Cloud Build `_TAG`, Terraform
+  `image_tag`); `:latest` never rolls out a new revision, so it is rejected.
 - Runtime env from Terraform: `UPSTREAM_URL`, `UPSTREAM_TIMEOUT_SECONDS`,
   `LOG_LEVEL`, optional `GRANIAN_WORKERS_KILL_TIMEOUT`.
 - Do not commit `terraform.tfvars`, credentials, or project secrets.
