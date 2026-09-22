@@ -33,9 +33,6 @@ pythonpath = ["src"]
 testpaths = ["tests/unit"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-markers = [
-    "container: Docker image smoke tests under tests/integration (see scripts/check-image.sh)",
-]
 filterwarnings = ["error::DeprecationWarning"]
 
 [tool.ruff]
@@ -49,8 +46,9 @@ select = [
     # Correctness and style baseline
     "E", "W", "F", "I", "UP", "B", "SIM", "RUF", "N", "C4", "PIE", "RET", "RSE", "PERF", "FURB",
     "PLE", "PLW", "PLC0415", "PLR2004", "PTH", "DTZ", "ERA", "T20", "PGH", "ANN001",
-    # Exceptions and logging: messages state the rule, never the value (PII in stack traces),
-    # log calls pass fields via extra= rather than interpolating them into the message
+    # Exceptions and logging: EM/TRY keep raise messages as reviewable literals and G/LOG keep
+    # log fields in extra=. Neither stops a value leaking into a message; the rule "state the
+    # rule, never the value" is enforced by the tests that scan log output for raw plates.
     "EM", "TRY", "BLE", "LOG", "G",
     # Security and boundaries
     "S", "ASYNC", "SLF", "TID", "INP",
@@ -59,24 +57,11 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# assert is the test idiom; integration tests invoke the docker CLI by name on purpose
-"tests/**" = ["S101", "S603", "S607"]
+# assert is the test idiom; literal expected values read better than named constants
+"tests/**" = ["S101", "PLR2004"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["onboarding_flow", "tests"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
-
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = [
-    "pydantic.Field",
-    "litestar.params.Parameter",
-    "litestar.di.Provide",
-]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "lf"
-skip-magic-trailing-comma = false

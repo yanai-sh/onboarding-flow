@@ -1,71 +1,36 @@
-from collections.abc import Iterator
-
 import pytest
 from pydantic import ValidationError
 
-from onboarding_flow.config import (
-    DEFAULT_UPSTREAM_TIMEOUT_SECONDS,
-    DEFAULT_UPSTREAM_URL,
-    Settings,
-    get_settings,
-    reset_settings_cache,
-    upstream_timeout_seconds,
-    upstream_url,
-)
-
-CUSTOM_TIMEOUT_SECONDS = 2.5
-INTEGER_TIMEOUT_SECONDS = 3  # env strings without a decimal point must still parse as float
-
-
-@pytest.fixture(autouse=True)
-def _clear_settings_cache() -> Iterator[None]:
-    reset_settings_cache()
-    yield
-    reset_settings_cache()
+from onboarding_flow.config import DEFAULT_UPSTREAM_URL, Settings, get_settings
 
 
 def test_settings_defaults() -> None:
     settings = Settings()
+
     assert str(settings.upstream_url) == DEFAULT_UPSTREAM_URL
-    assert settings.upstream_timeout_seconds == DEFAULT_UPSTREAM_TIMEOUT_SECONDS
+    assert settings.upstream_timeout_seconds == 5.0
+    assert settings.log_level == "INFO"
 
 
-def test_settings_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("UPSTREAM_URL", "https://example.test/vehicle-info")
-    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", str(CUSTOM_TIMEOUT_SECONDS))
-    reset_settings_cache()
+    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", "3")
+    monkeypatch.setenv("LOG_LEVEL", "debug")
 
     settings = get_settings()
+
     assert str(settings.upstream_url) == "https://example.test/vehicle-info"
-    assert settings.upstream_timeout_seconds == CUSTOM_TIMEOUT_SECONDS
+    assert settings.upstream_timeout_seconds == 3.0
+    assert settings.log_level == "DEBUG"
 
 
-def test_settings_rejects_invalid_upstream_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("UPSTREAM_URL", "not-a-url")
-    with pytest.raises(ValidationError):
-        Settings()
-
-
-def test_settings_log_level_defaults_to_info() -> None:
-    assert Settings().log_level == "INFO"
-
-
-def test_settings_log_level_normalizes_case(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LOG_LEVEL", "debug")
-    assert Settings().log_level == "DEBUG"
-
-
-def test_settings_rejects_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LOG_LEVEL", "loud")
-    with pytest.raises(ValidationError):
-        Settings()
-
-
-def test_legacy_config_helpers_use_cached_settings(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("UPSTREAM_URL", "not-a-url"), ("UPSTREAM_TIMEOUT_SECONDS", "0"), ("LOG_LEVEL", "loud")],
+)
+def test_settings_reject_invalid_values(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
 ) -> None:
-    monkeypatch.setenv("UPSTREAM_TIMEOUT_SECONDS", str(INTEGER_TIMEOUT_SECONDS))
-    reset_settings_cache()
-
-    assert upstream_url() == DEFAULT_UPSTREAM_URL
-    assert upstream_timeout_seconds() == float(INTEGER_TIMEOUT_SECONDS)
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError):
+        Settings()

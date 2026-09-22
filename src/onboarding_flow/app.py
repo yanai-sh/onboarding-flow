@@ -3,21 +3,24 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from importlib.metadata import version
 
 import httpx
 from litestar import Litestar, get
 from litestar.openapi.config import OpenAPIConfig
 
 from onboarding_flow.config import get_settings
-from onboarding_flow.encore_upstream import EncoreUpstream
-from onboarding_flow.logging_config import configure_logging
-from onboarding_flow.observability import TraceMiddleware, log_unhandled_exception
-from onboarding_flow.upstream import UpstreamPort
-from onboarding_flow.vehicle import VehicleController
+from onboarding_flow.observability import (
+    TraceMiddleware,
+    configure_logging,
+    log_unhandled_exception,
+)
+from onboarding_flow.upstream import EncoreUpstream, UpstreamPort
+from onboarding_flow.vehicle import vehicle_info
 
 OPENAPI_CONFIG = OpenAPIConfig(
     title="Onboarding Flow Vehicle Proxy",
-    version="0.1.0",
+    version=version("onboarding-flow"),
     description=(
         "Resilient proxy for the Encore vehicle-info endpoint. "
         "OpenAPI documents the Insait integration contract."
@@ -37,14 +40,13 @@ async def health() -> dict[str, str]:
 def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
     """Return the configured application for tests and ASGI servers."""
     configure_logging(get_settings().log_level)
-    injected_upstream = upstream
 
     @asynccontextmanager
     async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         client: httpx.AsyncClient | None = None
         upstream_details: dict[str, object] = {}
-        if injected_upstream is not None:
-            upstream_port: UpstreamPort = injected_upstream
+        if upstream is not None:
+            upstream_port: UpstreamPort = upstream
         else:
             settings = get_settings()
             client = httpx.AsyncClient()
@@ -75,7 +77,7 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
                 await client.aclose()
 
     return Litestar(
-        route_handlers=[health, VehicleController],
+        route_handlers=[health, vehicle_info],
         lifespan=[lifespan],
         middleware=[TraceMiddleware()],
         openapi_config=OPENAPI_CONFIG,

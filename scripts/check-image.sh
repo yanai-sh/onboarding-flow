@@ -1,29 +1,41 @@
 #!/usr/bin/env bash
-# Tier-2 packaging smoke: build OCI image and hit /health (requires Docker + buildx).
+# Container smoke: build the image for the native platform, run it on a
+# non-default $PORT, and check /health plus a network-free POST /vehicle-info
+# (a malformed plate is rejected before any upstream call).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-  echo "error: do not run with sudo (uv and docker group are per-user)." >&2
+IMAGE="${IMAGE:-onboarding-flow:smoke}"
+PORT=9090
+
+command -v curl >/dev/null || { echo "error: curl not found" >&2; exit 1; }
+docker buildx version >/dev/null || { echo "error: docker buildx (BuildKit) required" >&2; exit 1; }
+
+docker buildx build --load --tag "$IMAGE" .
+
+cid="$(docker run --detach -e PORT="$PORT" -p "127.0.0.1::$PORT" "$IMAGE")"
+trap 'docker rm --force "$cid" >/dev/null 2>&1 || true' EXIT
+base="http://$(docker port "$cid" "$PORT/tcp")"
+
+fail() {
+  echo "error: $*" >&2
+  docker logs "$cid" >&2 || true
   exit 1
-fi
+}
 
-if ! command -v uv >/dev/null 2>&1; then
-  echo "error: uv not found on PATH." >&2
-  exit 1
-fi
+for attempt in $(seq 60); do
+  [[ "$(curl -fsS --max-time 2 "$base/health" 2>/dev/null)" == *'"status":"ok"'* ]] && break
+  ((attempt < 60)) || fail "/health did not answer on PORT=$PORT within 30s"
+  sleep 0.5
+done
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "error: docker not found. See docs/runbook-dev-environment.md." >&2
-  exit 1
-fi
+out="$(curl -sS --max-time 10 -w '\n%{http_code} %{content_type}' \
+  -H 'Content-Type: application/json' -d '{"license_plate":"12-3"}' "$base/vehicle-info")" \
+  || fail "POST /vehicle-info request failed"
+meta="${out##*$'\n'}"
+body="${out%$'\n'*}"
+[[ "$meta" == "200 application/json"* ]] || fail "POST /vehicle-info: expected 200 JSON, got '$meta'"
+[[ "$body" == *'"error_code":"INVALID_REQUEST"'* ]] \
+  || fail "POST /vehicle-info: expected INVALID_REQUEST, got $body"
 
-if ! docker info >/dev/null 2>&1; then
-  echo "error: docker daemon not reachable. Log in to WSL anew after usermod -aG docker." >&2
-  exit 1
-fi
-
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
-
-uv run pytest tests/integration -m container "$@"
+echo "ok: $IMAGE serves /health and POST /vehicle-info on PORT=$PORT"

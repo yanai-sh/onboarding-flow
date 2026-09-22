@@ -1,153 +1,215 @@
 import json
-from collections.abc import Callable
-from contextlib import AbstractContextManager
+import uuid
 from http import HTTPStatus
 from typing import Any
 
+import httpx
+import pytest
 from litestar.testing import TestClient
 
-from onboarding_flow.app import create_app
-from onboarding_flow.envelope import ErrorCode
-from onboarding_flow.memory_upstream import MemoryUpstream, failure_upstream
-from onboarding_flow.schemas import MAX_TRACE_ID_LENGTH, VehicleData
-from onboarding_flow.upstream import UpstreamFailureKind, UpstreamPort
+from onboarding_flow.observability import MAX_TRACE_ID_LENGTH
+from onboarding_flow.schemas import ErrorCode
+from onboarding_flow.upstream import EncoreUpstream
+from tests.fakes import MemoryUpstream
+from tests.shared import LIVE_PLATE, LIVE_VEHICLE, LIVE_VEHICLE_JSON, OpenClient
 
 
-def test_health_endpoint(api_client: TestClient) -> None:
-    response = api_client.get("/health")
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {"status": "ok"}
+def _completed(json_logs: list[dict[str, Any]]) -> dict[str, Any]:
+    [event] = [line for line in json_logs if line["message"] == "vehicle_lookup_completed"]
+    return event
 
 
-def test_vehicle_info_happy_path_matches_assignment_shape(
-    api_client: TestClient,
-    assignment_plate: str,
-    assignment_vehicle: VehicleData,
-    success_memory_upstream: MemoryUpstream,
-) -> None:
-    response = api_client.post("/vehicle-info", json={"license_plate": assignment_plate})
+def _lookup(client: TestClient, plate: object, **kwargs: Any) -> httpx.Response:
+    return client.post("/vehicle-info", json={"license_plate": plate}, **kwargs)
+
+
+def test_lookup_returns_vehicle_in_assignment_shape(open_client: OpenClient) -> None:
+    upstream = MemoryUpstream(LIVE_VEHICLE)
+    with open_client(upstream) as client:
+        response = _lookup(client, LIVE_PLATE)
 
     assert response.status_code == HTTPStatus.OK
     body = response.json()
-    assert body["success"] is True
-    assert body["data"] == assignment_vehicle.model_dump(mode="json")
-    assert body["trace_id"]
-    assert success_memory_upstream.call_count == 1
+    assert body == {
+        "success": True,
+        "data": LIVE_VEHICLE_JSON,
+        "error_code": None,
+        "message": None,
+        "trace_id": body["trace_id"],
+    }
+    assert "טויוטה".encode() in response.content
+    assert uuid.UUID(body["trace_id"]).version == 7
+    assert response.headers["x-trace-id"] == body["trace_id"]
+    assert upstream.plates == [LIVE_PLATE]
 
 
-def test_vehicle_info_upstream_failure_returns_envelope_smoke(
-    open_api_client: Callable[[UpstreamPort], AbstractContextManager[TestClient]],
-    assignment_plate: str,
+@pytest.mark.parametrize(
+    ("typed", "sent"),
+    [
+        ("1234567", "1234567"),
+        ("12-345-67", "1234567"),
+        ("123-45-678", "12345678"),
+        (" 123 45 678 ", "12345678"),
+        ("12.345.67", "1234567"),
+    ],
+)
+def test_formatted_plates_are_sent_upstream_as_digits(
+    open_client: OpenClient, typed: str, sent: str
 ) -> None:
-    upstream = failure_upstream(UpstreamFailureKind.NOT_FOUND)
-    with open_api_client(upstream) as client:
-        response = client.post("/vehicle-info", json={"license_plate": assignment_plate})
+    upstream = MemoryUpstream(LIVE_VEHICLE)
+    with open_client(upstream) as client:
+        response = _lookup(client, typed)
+
+    assert response.json()["success"] is True
+    assert upstream.plates == [sent]
+
+
+@pytest.mark.parametrize(
+    "plate",
+    # The last value is 1234567 in full-width digits, which str.isdigit() would accept.
+    [
+        "",
+        "   ",
+        "ABC",
+        "123456",
+        "123456789",
+        "12_345_67",
+        "12/345/67",
+        "\uff11\uff12\uff13\uff14\uff15\uff16\uff17",
+    ],
+)
+def test_plate_breaking_the_rule_returns_invalid_request_without_upstream_call(
+    open_client: OpenClient, plate: str, json_logs: list[dict[str, Any]]
+) -> None:
+    upstream = MemoryUpstream(LIVE_VEHICLE)
+    with open_client(upstream) as client:
+        response = _lookup(client, plate)
 
     assert response.status_code == HTTPStatus.OK
     body = response.json()
     assert body["success"] is False
-    assert body["error_code"] == ErrorCode.VEHICLE_NOT_FOUND.value
-
-
-def test_vehicle_info_invalid_plate_returns_client_error_and_skips_upstream(
-    open_api_client: Callable[[UpstreamPort], AbstractContextManager[TestClient]],
-    success_memory_upstream: MemoryUpstream,
-) -> None:
-    # Litestar may respond with 400 or 422 for validation failures.
-    with open_api_client(success_memory_upstream) as client:
-        response = client.post("/vehicle-info", json={"license_plate": "bad-plate"})
-
-    assert response.status_code in {400, 422}
-    assert success_memory_upstream.call_count == 0
-
-
-def test_trace_id_echoed_when_provided(
-    api_client: TestClient,
-    assignment_plate: str,
-) -> None:
-    response = api_client.post(
-        "/vehicle-info",
-        json={"license_plate": assignment_plate},
-        headers={"X-Trace-ID": "client-trace-99"},
+    assert body["data"] is None
+    assert body["error_code"] == "INVALID_REQUEST"
+    assert body["message"] == (
+        "That plate number doesn't look right. Israeli plates have 7 or 8 digits."
     )
+    assert upstream.plates == []
+    event = _completed(json_logs)
+    assert event["error_code"] == "INVALID_REQUEST"
+    assert "plate_mask" not in event
 
-    assert response.status_code == HTTPStatus.OK
-    assert response.headers.get("x-trace-id") == "client-trace-99"
-    assert response.json()["trace_id"] == "client-trace-99"
 
-
-def test_trace_id_generated_when_missing(
-    api_client: TestClient,
-    assignment_plate: str,
+@pytest.mark.parametrize(
+    "request_kwargs",
+    [
+        {"content": b"not json", "headers": {"content-type": "application/json"}},
+        {"json": {}},
+        {"json": {"license_plate": 12345678}},
+        {"json": {"license_plate": None}},
+        {"json": {"license_plate": "1" * 33}},
+    ],
+    ids=["malformed-json", "missing-field", "integer", "null", "over-length"],
+)
+def test_malformed_request_bodies_are_rejected_by_the_framework(
+    open_client: OpenClient, request_kwargs: dict[str, Any], json_logs: list[dict[str, Any]]
 ) -> None:
-    response = api_client.post("/vehicle-info", json={"license_plate": assignment_plate})
+    upstream = MemoryUpstream(LIVE_VEHICLE)
+    with open_client(upstream) as client:
+        response = client.post("/vehicle-info", **request_kwargs)
 
-    trace = response.json()["trace_id"]
-    assert trace
-    assert response.headers.get("x-trace-id") == trace
-
-
-def test_request_logs_carry_request_trace_id(
-    api_client: TestClient,
-    assignment_plate: str,
-    json_logs: list[dict[str, Any]],
-) -> None:
-    api_client.post(
-        "/vehicle-info",
-        json={"license_plate": assignment_plate},
-        headers={"X-Trace-ID": "client-trace-77"},
-    )
-
-    completed = [line for line in json_logs if line["message"] == "vehicle_lookup_completed"]
-    assert len(completed) == 1
-    assert completed[0]["trace_id"] == "client-trace-77"
-
-
-def test_unhandled_upstream_exception_logs_error_with_trace_id(
-    assignment_plate: str,
-    json_logs: list[dict[str, Any]],
-) -> None:
-    upstream = MemoryUpstream(exc=RuntimeError("adapter exploded"))
-    with TestClient(app=create_app(upstream=upstream), raise_server_exceptions=False) as client:
-        response = client.post(
-            "/vehicle-info",
-            json={"license_plate": assignment_plate},
-            headers={"X-Trace-ID": "client-trace-500"},
-        )
-
-    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
-    errors = [line for line in json_logs if line["severity"] == "ERROR"]
-    assert len(errors) == 1
-    assert errors[0]["message"] == "request_failed"
-    assert errors[0]["trace_id"] == "client-trace-500"
-    assert "RuntimeError: adapter exploded" in errors[0]["stack_trace"]
-    # The request body (and therefore the plate) is never part of the traceback payload.
-    assert assignment_plate not in json.dumps(json_logs)
-
-
-def test_invalid_plate_does_not_log_error(
-    api_client: TestClient,
-    json_logs: list[dict[str, Any]],
-) -> None:
-    response = api_client.post("/vehicle-info", json={"license_plate": "bad-plate"})
-
-    assert response.status_code in {400, 422}
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert upstream.plates == []
     assert not [line for line in json_logs if line["severity"] == "ERROR"]
 
 
-def test_trace_id_invalid_header_is_replaced(
-    api_client: TestClient,
-    assignment_plate: str,
-) -> None:
-    invalid = "x" * (MAX_TRACE_ID_LENGTH + 1)
-    response = api_client.post(
-        "/vehicle-info",
-        json={"license_plate": assignment_plate},
-        headers={"X-Trace-ID": invalid},
-    )
+@pytest.mark.parametrize("code", list(ErrorCode))
+def test_every_error_code_has_a_message(open_client: OpenClient, code: ErrorCode) -> None:
+    with open_client(MemoryUpstream(code)) as client:
+        response = _lookup(client, LIVE_PLATE)
 
     assert response.status_code == HTTPStatus.OK
+    body = response.json()
+    assert body["success"] is False
+    assert body["data"] is None
+    assert body["error_code"] == code.value
+    assert body["message"]
+    assert LIVE_PLATE not in body["message"]
+
+
+def test_completion_log_masks_plate_and_carries_client_trace_id(
+    open_client: OpenClient, json_logs: list[dict[str, Any]]
+) -> None:
+    with open_client(MemoryUpstream(ErrorCode.VEHICLE_NOT_FOUND)) as client:
+        response = _lookup(client, "123-45-678", headers={"X-Trace-ID": "client-trace-77"})
+
+    assert response.headers["x-trace-id"] == "client-trace-77"
+    assert response.json()["trace_id"] == "client-trace-77"
+    event = _completed(json_logs)
+    assert event["trace_id"] == "client-trace-77"
+    assert event["plate_mask"] == "****5678"
+    assert event["success"] is False
+    assert event["error_code"] == "VEHICLE_NOT_FOUND"
+    assert event["duration_ms"] >= 0
+    logged = json.dumps(json_logs, ensure_ascii=False)
+    assert "12345678" not in logged
+    assert "123-45-678" not in logged
+
+
+def test_input_breaking_the_plate_rule_never_reaches_the_logs(
+    open_client: OpenClient, json_logs: list[dict[str, Any]]
+) -> None:
+    with open_client(MemoryUpstream(LIVE_VEHICLE)) as client:
+        _lookup(client, "SECRET-99")
+
+    assert json_logs
+    assert "SECRET" not in json.dumps(json_logs, ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    "header",
+    [b"x" * (MAX_TRACE_ID_LENGTH + 1), b"a b", b"abc\tdef", "abcé".encode()],
+    ids=["too-long", "space", "tab", "non-ascii"],
+)
+def test_invalid_trace_id_header_is_replaced(open_client: OpenClient, header: bytes) -> None:
+    with open_client(MemoryUpstream(LIVE_VEHICLE)) as client:
+        response = _lookup(client, LIVE_PLATE, headers={"X-Trace-ID": header})
+
     trace = response.json()["trace_id"]
-    assert trace != invalid
-    assert len(trace) <= MAX_TRACE_ID_LENGTH
-    assert response.headers.get("x-trace-id") == trace
+    assert uuid.UUID(trace).version == 7
+    assert response.headers.get_list("x-trace-id") == [trace]
+
+
+def test_unhandled_adapter_error_returns_500_and_logs_trace_id(
+    open_client: OpenClient, json_logs: list[dict[str, Any]]
+) -> None:
+    with open_client(MemoryUpstream(RuntimeError("adapter exploded"))) as client:
+        response = _lookup(client, LIVE_PLATE, headers={"X-Trace-ID": "client-trace-500"})
+
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    [error] = [line for line in json_logs if line["severity"] == "ERROR"]
+    assert error["message"] == "request_failed"
+    assert error["trace_id"] == "client-trace-500"
+    assert "RuntimeError: adapter exploded" in error["stack_trace"]
+    assert LIVE_PLATE not in json.dumps(json_logs)
+
+
+def test_hebrew_vehicle_round_trips_through_the_real_adapter(
+    open_client: OpenClient, json_logs: list[dict[str, Any]]
+) -> None:
+    def registry(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"success": True, "data": LIVE_VEHICLE_JSON})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(registry))
+    upstream = EncoreUpstream(client, "https://registry.test/vehicle-info", 5.0)
+    with open_client(upstream) as api:
+        response = _lookup(api, LIVE_PLATE)
+
+    assert response.json()["data"] == LIVE_VEHICLE_JSON
+    assert "קורולה".encode() in response.content
+    # httpx's own INFO request line would leak outside the documented event catalogue.
+    assert [line["message"] for line in json_logs] == [
+        "app_started",
+        "vehicle_lookup_completed",
+        "app_stopping",
+    ]
+    assert LIVE_PLATE not in json.dumps(json_logs)

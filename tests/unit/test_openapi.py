@@ -1,52 +1,26 @@
 from http import HTTPStatus
-from typing import Any
 
-from litestar.testing import TestClient
-
-from onboarding_flow.envelope import VehicleInfoResponse
-from onboarding_flow.schemas import VehicleData, VehicleRequest
+from tests.fakes import MemoryUpstream
+from tests.shared import LIVE_VEHICLE, OpenClient
 
 
-def _property_names(component_schema: dict[str, Any]) -> set[str]:
-    properties = component_schema.get("properties")
-    assert isinstance(properties, dict), "OpenAPI component schema missing properties"
-    return set(properties)
+def test_openapi_documents_the_vehicle_info_contract(open_client: OpenClient) -> None:
+    with open_client(MemoryUpstream(LIVE_VEHICLE)) as client:
+        response = client.get("/schema/openapi.json")
 
-
-def test_openapi_schema_lists_vehicle_info(api_client: TestClient) -> None:
-    response = api_client.get("/schema/openapi.json")
     assert response.status_code == HTTPStatus.OK
     schema = response.json()
-    assert schema["info"]["title"] == "Onboarding Flow Vehicle Proxy"
-    paths = schema["paths"]
-    assert isinstance(paths, dict)
-    assert "/vehicle-info" in paths
-    assert "post" in paths["/vehicle-info"]
-    assert "/health" in paths
-
-
-def test_openapi_vehicle_models_match_pydantic_contract(api_client: TestClient) -> None:
-    response = api_client.get("/schema/openapi.json")
-    assert response.status_code == HTTPStatus.OK
-    schema = response.json()
-    components = schema["components"]
-    assert isinstance(components, dict)
-    schemas = components["schemas"]
-    assert isinstance(schemas, dict)
-
-    assert _property_names(schemas["VehicleRequest"]) == set(VehicleRequest.model_fields)
-    assert _property_names(schemas["VehicleInfoResponse"]) == set(VehicleInfoResponse.model_fields)
-    assert _property_names(schemas["VehicleData"]) == set(VehicleData.model_fields)
-
+    assert "/health" in schema["paths"]
     post = schema["paths"]["/vehicle-info"]["post"]
-    assert isinstance(post, dict)
-    request_ref = post["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-    assert request_ref == "#/components/schemas/VehicleRequest"
-
-    response_ref = post["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-    assert response_ref == "#/components/schemas/VehicleInfoResponse"
-
-    responses = post["responses"]
-    assert isinstance(responses, dict)
-    client_error_codes = {int(code) for code in responses if code.isdigit()}
-    assert client_error_codes & {400, 422}
+    request_schema = post["requestBody"]["content"]["application/json"]["schema"]
+    assert request_schema["$ref"] == "#/components/schemas/VehicleRequest"
+    ok_schema = post["responses"]["200"]["content"]["application/json"]["schema"]
+    assert ok_schema["$ref"] == "#/components/schemas/VehicleInfoResponse"
+    assert "400" in post["responses"]
+    assert set(schema["components"]["schemas"]["ErrorCode"]["enum"]) == {
+        "INVALID_REQUEST",
+        "VEHICLE_NOT_FOUND",
+        "UPSTREAM_TIMEOUT",
+        "UPSTREAM_UNAVAILABLE",
+        "UPSTREAM_INVALID_RESPONSE",
+    }

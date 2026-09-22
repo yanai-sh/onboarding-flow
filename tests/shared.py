@@ -1,65 +1,23 @@
-"""Test-only helpers and literals shared across pytest modules."""
+"""Test-only literals and types shared across pytest modules."""
 
-import os
-import shutil
-import subprocess
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+from typing import Any
+
+from litestar.testing import TestClient
 
 from onboarding_flow.schemas import VehicleData
+from onboarding_flow.upstream import UpstreamPort
 
-ASSIGNMENT_SAMPLE_VEHICLE = VehicleData(
-    license_plate="12345678",
-    manufacturer="Toyota",
-    model="Corolla",
-    year=2020,
-    color="White",
-)
+type OpenClient = Callable[[UpstreamPort], AbstractContextManager[TestClient]]
 
-DEFAULT_CONTAINER_IMAGE = "onboarding-flow:test"
-
-# BuildKit is required for Dockerfile cache/bind mounts (not the legacy builder).
-DOCKER_BUILD_ENV: dict[str, str] = {
-    "DOCKER_BUILDKIT": "1",
-    "COMPOSE_DOCKER_CLI_BUILD": "1",
+# Recorded from the live upstream (2026-09-22): vehicle text comes back in Hebrew.
+LIVE_PLATE = "12345678"
+LIVE_VEHICLE_JSON: dict[str, Any] = {
+    "license_plate": LIVE_PLATE,
+    "manufacturer": "טויוטה",
+    "model": "קורולה",
+    "year": 2020,
+    "color": "לבן",
 }
-
-
-def docker_daemon_available() -> bool:
-    if shutil.which("docker") is None:
-        return False
-    try:
-        completed = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=5,
-            check=False,
-            env={**os.environ, **DOCKER_BUILD_ENV},
-        )
-    except OSError, subprocess.TimeoutExpired:
-        return False
-    return completed.returncode == 0
-
-
-def docker_buildkit_available() -> bool:
-    """True when buildx/BuildKit tooling is present (project standard)."""
-    if not docker_daemon_available():
-        return False
-    completed = subprocess.run(
-        ["docker", "buildx", "version"],
-        capture_output=True,
-        timeout=5,
-        check=False,
-        env={**os.environ, **DOCKER_BUILD_ENV},
-    )
-    return completed.returncode == 0
-
-
-def container_image_exists(tag: str) -> bool:
-    if not docker_daemon_available():
-        return False
-    completed = subprocess.run(
-        ["docker", "image", "inspect", tag],
-        capture_output=True,
-        timeout=10,
-        check=False,
-    )
-    return completed.returncode == 0
+LIVE_VEHICLE = VehicleData.model_validate(LIVE_VEHICLE_JSON)

@@ -1,55 +1,71 @@
-import uuid
-from types import SimpleNamespace
-from unittest.mock import MagicMock
+import json
+import logging
+import sys
+from typing import Any
 
 import pytest
 
-from onboarding_flow.observability import mask_plate, parse_trace_id, trace_id_from_request
+from onboarding_flow.observability import TRACE_ID, JsonFormatter, TraceIdFilter, mask_plate
 
-UUID_VERSION_7 = 7
-
-
-def _assert_uuid7(trace: str) -> None:
-    assert uuid.UUID(trace).version == UUID_VERSION_7
+_logger = logging.getLogger("tests.observability")
 
 
-def test_mask_plate_hides_prefix() -> None:
-    assert mask_plate("12345678") == "****5678"
+def _record(
+    message: str,
+    *,
+    level: int = logging.INFO,
+    extra: dict[str, Any] | None = None,
+    exc_info: Any = None,
+) -> logging.LogRecord:
+    return _logger.makeRecord(_logger.name, level, __file__, 1, message, (), exc_info, extra=extra)
 
 
-def test_mask_plate_short_values() -> None:
-    assert mask_plate("AB") == "****"
+def test_json_formatter_emits_cloud_logging_fields_and_non_null_extras() -> None:
+    extra = {"plate_mask": "****5678", "count": 2}
+    payload = json.loads(JsonFormatter().format(_record("hello", extra={**extra, "gone": None})))
+
+    assert payload["severity"] == "INFO"
+    assert payload["message"] == "hello"
+    assert payload["logger"] == "tests.observability"
+    assert payload["time"].endswith("+00:00")
+    assert {key: payload[key] for key in extra} == extra
+    assert "gone" not in payload
 
 
-def test_parse_trace_id_generates_uuid7_when_header_missing() -> None:
-    trace = parse_trace_id(None)
-    _assert_uuid7(trace)
+def _boom() -> None:
+    msg = "boom"
+    raise ValueError(msg)
 
 
-def test_parse_trace_id_generates_uuid7_when_header_blank() -> None:
-    trace = parse_trace_id("   ")
-    _assert_uuid7(trace)
+def test_json_formatter_renders_exceptions_on_one_line() -> None:
+    try:
+        _boom()
+    except ValueError:
+        record = _record("failed", level=logging.ERROR, exc_info=sys.exc_info())
+
+    line = JsonFormatter().format(record)
+
+    assert "\n" not in line
+    assert "ValueError: boom" in json.loads(line)["stack_trace"]
 
 
-def test_parse_trace_id_accepts_valid_client_value() -> None:
-    assert parse_trace_id("client-trace-99") == "client-trace-99"
+def test_trace_id_filter_copies_request_context_onto_records() -> None:
+    token = TRACE_ID.set("ctx-trace")
+    try:
+        inside = _record("x")
+        TraceIdFilter().filter(inside)
+    finally:
+        TRACE_ID.reset(token)
+    outside = _record("x")
+    TraceIdFilter().filter(outside)
+
+    assert json.loads(JsonFormatter().format(inside))["trace_id"] == "ctx-trace"
+    assert "trace_id" not in json.loads(JsonFormatter().format(outside))
 
 
-def test_parse_trace_id_replaces_invalid_header_with_uuid7() -> None:
-    invalid = "x" * 200
-    trace = parse_trace_id(invalid)
-    assert trace != invalid
-    _assert_uuid7(trace)
-
-
-def test_trace_id_from_request_requires_middleware_state() -> None:
-    request = MagicMock()
-    request.state = SimpleNamespace()
-    with pytest.raises(RuntimeError, match="TraceMiddleware"):
-        trace_id_from_request(request)
-
-
-def test_trace_id_from_request_returns_bound_value() -> None:
-    request = MagicMock()
-    request.state = SimpleNamespace(trace_id="bound-trace")
-    assert trace_id_from_request(request) == "bound-trace"
+@pytest.mark.parametrize(
+    ("plate", "masked"),
+    [("12345678", "****5678"), ("1234567", "***4567"), ("1234", "****")],
+)
+def test_mask_plate_keeps_only_the_last_four_characters(plate: str, masked: str) -> None:
+    assert mask_plate(plate) == masked

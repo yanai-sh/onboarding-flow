@@ -1,85 +1,62 @@
-"""Inbound request and shared vehicle record types for the vehicle lookup proxy."""
+"""Wire types for the vehicle lookup proxy and the shared license plate rule."""
 
-import uuid
+import re
+from enum import StrEnum
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, TypeAdapter, ValidationError
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
-MAX_LICENSE_PLATE_LENGTH = 32
+# Structural bound on the raw request string; longer input is a client bug, not a typo.
+MAX_LICENSE_PLATE_INPUT_LENGTH = 32
 VEHICLE_YEAR_MIN = 1900
 VEHICLE_YEAR_MAX = 2100
-VEHICLE_TEXT_MAX_LENGTH = 128
-MAX_TRACE_ID_LENGTH = 128
 
-
-def _strip_if_str(value: object) -> object:
-    if isinstance(value, str):
-        return value.strip()
-    return value
+# The upstream accepts Israeli plates only: 7 or 8 ASCII digits. People write them
+# as 12-345-67 or 123.45.678, so separators are removed before the rule applies.
+_PLATE_SEPARATORS = re.compile(r"[ .-]")
+_PLATE_DIGITS = re.compile(r"[0-9]{7,8}")
 
 
 def normalize_license_plate(value: str) -> str:
-    normalized = value.upper()
-    if not normalized:
-        msg = "license plate is required"
+    """Return the digits-only plate sent upstream, or raise if it breaks the plate rule."""
+    plate = _PLATE_SEPARATORS.sub("", value.strip())
+    if not _PLATE_DIGITS.fullmatch(plate):
+        msg = "license plate must be 7 or 8 digits"
         raise ValueError(msg)
-    if len(normalized) > MAX_LICENSE_PLATE_LENGTH:
-        msg = f"license plate must be at most {MAX_LICENSE_PLATE_LENGTH} characters"
-        raise ValueError(msg)
-    if not normalized.isascii() or not normalized.isalnum():
-        msg = "license plate must be ASCII alphanumeric"
-        raise ValueError(msg)
-    return normalized
+    return plate
 
 
-LicensePlate = Annotated[
-    str,
-    BeforeValidator(_strip_if_str),
-    AfterValidator(normalize_license_plate),
-]
-
-TraceId = Annotated[
-    str,
-    Field(min_length=1, max_length=MAX_TRACE_ID_LENGTH, pattern=r"[\x21-\x7E]+"),
-]
-
-_trace_id_adapter = TypeAdapter(TraceId)
+LicensePlate = Annotated[str, AfterValidator(normalize_license_plate)]
+VehicleText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
 
 
-def _new_trace_id() -> TraceId:
-    return _trace_id_adapter.validate_python(str(uuid.uuid7()))
+class ErrorCode(StrEnum):
+    """Stable codes for Insait routing on HTTP 200 responses (ADR 0003)."""
+
+    INVALID_REQUEST = "INVALID_REQUEST"
+    VEHICLE_NOT_FOUND = "VEHICLE_NOT_FOUND"
+    UPSTREAM_TIMEOUT = "UPSTREAM_TIMEOUT"
+    UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
+    UPSTREAM_INVALID_RESPONSE = "UPSTREAM_INVALID_RESPONSE"
 
 
-def parse_trace_id(header_value: str | None) -> TraceId:
-    """Resolve trace id from X-Trace-ID; invalid client values are replaced with a new UUID."""
-    if not header_value or not header_value.strip():
-        return _new_trace_id()
-    stripped = header_value.strip()
-    try:
-        return _trace_id_adapter.validate_python(stripped)
-    except ValidationError:
-        return _new_trace_id()
-
-
-def _strip_vehicle_text(value: str) -> str:
-    return value.strip()
-
-
-NonEmptyVehicleText = Annotated[
-    str,
-    BeforeValidator(_strip_if_str),
-    AfterValidator(_strip_vehicle_text),
-    Field(min_length=1, max_length=VEHICLE_TEXT_MAX_LENGTH),
-]
+class VehicleRequest(BaseModel):
+    # Only structural checks here: a plate that breaks the plate rule is a lookup
+    # outcome returned in the envelope, not a framework 4xx (ADR 0003).
+    license_plate: str = Field(max_length=MAX_LICENSE_PLATE_INPUT_LENGTH)
 
 
 class VehicleData(BaseModel):
     license_plate: LicensePlate
-    manufacturer: NonEmptyVehicleText
-    model: NonEmptyVehicleText
+    manufacturer: VehicleText
+    model: VehicleText
     year: int = Field(ge=VEHICLE_YEAR_MIN, le=VEHICLE_YEAR_MAX)
-    color: NonEmptyVehicleText
+    color: VehicleText
 
 
-class VehicleRequest(BaseModel):
-    license_plate: LicensePlate
+class VehicleInfoResponse(BaseModel):
+    success: bool
+    data: VehicleData | None = None
+    error_code: ErrorCode | None = None
+    message: str | None = None
+    trace_id: str

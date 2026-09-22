@@ -1,23 +1,19 @@
-"""Shared pytest fixtures for unit and integration tests."""
+"""Shared pytest fixtures."""
 
 import json
 import logging
-from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 import pytest
 from litestar.testing import TestClient
 
 from onboarding_flow.app import create_app
-from onboarding_flow.config import reset_settings_cache
-from onboarding_flow.logging_config import JsonFormatter, TraceIdFilter
-from onboarding_flow.memory_upstream import MemoryUpstream, success_upstream
-from onboarding_flow.schemas import VehicleData
-from tests.shared import ASSIGNMENT_SAMPLE_VEHICLE
-
-if TYPE_CHECKING:
-    from onboarding_flow.upstream import UpstreamPort
+from onboarding_flow.config import get_settings
+from onboarding_flow.observability import JsonFormatter, TraceIdFilter
+from onboarding_flow.upstream import UpstreamPort
+from tests.shared import OpenClient
 
 
 class _JsonLineHandler(logging.Handler):
@@ -51,37 +47,19 @@ def json_logs() -> Iterator[list[dict[str, Any]]]:
 
 @pytest.fixture(autouse=True)
 def _reset_settings_cache_between_tests() -> Iterator[None]:
-    reset_settings_cache()
+    get_settings.cache_clear()
     yield
-    reset_settings_cache()
+    get_settings.cache_clear()
 
 
 @pytest.fixture
-def assignment_vehicle() -> VehicleData:
-    return ASSIGNMENT_SAMPLE_VEHICLE
+def open_client() -> OpenClient:
+    """Open a ``TestClient`` for an app wired to the given upstream port."""
 
-
-@pytest.fixture
-def assignment_plate(assignment_vehicle: VehicleData) -> str:
-    return assignment_vehicle.license_plate
-
-
-@pytest.fixture
-def success_memory_upstream(assignment_vehicle: VehicleData) -> MemoryUpstream:
-    return success_upstream(assignment_vehicle)
-
-
-@pytest.fixture
-def api_client(success_memory_upstream: MemoryUpstream) -> Iterator[TestClient]:
-    with TestClient(app=create_app(upstream=success_memory_upstream)) as client:
-        yield client
-
-
-@pytest.fixture
-def open_api_client() -> Callable[[UpstreamPort], AbstractContextManager[TestClient]]:
     @contextmanager
     def _open(upstream: UpstreamPort) -> Iterator[TestClient]:
-        with TestClient(app=create_app(upstream=upstream)) as client:
+        app = create_app(upstream=upstream)
+        with TestClient(app=app, raise_server_exceptions=False) as client:
             yield client
 
     return _open
