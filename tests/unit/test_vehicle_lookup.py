@@ -59,6 +59,8 @@ async def test_lookup_logs_masked_plate_not_raw_value(
     assert event["plate_mask"] == "****5678"
     assert event["trace_id"] == "trace-log"
     assert event["success"] is True
+    assert isinstance(event["duration_ms"], int | float)
+    assert event["duration_ms"] >= 0
     assert plate not in json.dumps(json_logs)
 
 

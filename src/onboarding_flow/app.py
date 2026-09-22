@@ -1,5 +1,6 @@
 """ASGI application assembly for the onboarding flow service."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,8 @@ OPENAPI_CONFIG = OpenAPIConfig(
     path="/schema",
 )
 
+logger = logging.getLogger(__name__)
+
 
 @get("/health", tags=["Health"], summary="Liveness probe")
 async def health() -> dict[str, str]:
@@ -38,22 +41,38 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
 
     @asynccontextmanager
     async def lifespan(app: Litestar) -> AsyncGenerator[None]:
+        client: httpx.AsyncClient | None = None
+        upstream_details: dict[str, object] = {}
         if injected_upstream is not None:
-            app.state.upstream = injected_upstream
-            yield
-            return
-
-        settings = get_settings()
-        session = httpx.AsyncClient()
-        try:
-            app.state.upstream = EncoreUpstream(
-                session,
+            upstream_port: UpstreamPort = injected_upstream
+        else:
+            settings = get_settings()
+            client = httpx.AsyncClient()
+            upstream_port = EncoreUpstream(
+                client,
                 settings.upstream_url,
                 settings.upstream_timeout_seconds,
             )
+            upstream_details = {
+                "upstream_host": settings.upstream_url.host,
+                "upstream_timeout_seconds": settings.upstream_timeout_seconds,
+            }
+
+        app.state.upstream = upstream_port
+        logger.info(
+            "app_started",
+            extra={
+                "upstream_adapter": type(upstream_port).__name__,
+                "version": OPENAPI_CONFIG.version,
+                **upstream_details,
+            },
+        )
+        try:
             yield
         finally:
-            await session.aclose()
+            logger.info("app_stopping")
+            if client is not None:
+                await client.aclose()
 
     return Litestar(
         route_handlers=[health, VehicleController],

@@ -1,6 +1,7 @@
 """Vehicle lookup orchestration: upstream fetch, envelope mapping, completion logging."""
 
 import logging
+import time
 
 from onboarding_flow.envelope import VehicleInfoResponse, vehicle_info_response
 from onboarding_flow.observability import mask_plate
@@ -15,7 +16,9 @@ async def lookup_vehicle_info(
     upstream: UpstreamPort,
     trace_id: TraceId,
 ) -> VehicleInfoResponse:
+    started = time.perf_counter()
     outcome = await upstream.fetch_vehicle(license_plate)
+    duration_ms = round((time.perf_counter() - started) * 1000, 1)
     response = vehicle_info_response(outcome, trace_id)
 
     logger.info(
@@ -25,6 +28,7 @@ async def lookup_vehicle_info(
             "success": response.success,
             "error_code": response.error_code,
             "plate_mask": mask_plate(license_plate),
+            "duration_ms": duration_ms,
         },
     )
     return response
