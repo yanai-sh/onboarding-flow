@@ -1,11 +1,14 @@
 """Request trace correlation and PII-safe logging helpers."""
 
+import logging
 from typing import TYPE_CHECKING, override
 
 from litestar.enums import ScopeType
+from litestar.exceptions import HTTPException
 from litestar.middleware.base import ASGIMiddleware
 from litestar.types import ASGIApp, Message, Receive, Scope, Send
 
+from onboarding_flow.logging_config import TRACE_ID
 from onboarding_flow.schemas import LicensePlate, TraceId, parse_trace_id
 from onboarding_flow.state import trace_id_from_state
 
@@ -13,6 +16,8 @@ if TYPE_CHECKING:
     from litestar import Request
 
 TRACE_HEADER = "X-Trace-ID"
+
+logger = logging.getLogger(__name__)
 
 
 def mask_plate(license_plate: LicensePlate) -> str:
@@ -57,7 +62,25 @@ class TraceMiddleware(ASGIMiddleware):
                 case _:
                     await send(message)
 
-        await next_app(scope, receive, send_wrapper)
+        token = TRACE_ID.set(trace_id)
+        try:
+            await next_app(scope, receive, send_wrapper)
+        finally:
+            TRACE_ID.reset(token)
+
+
+async def log_unhandled_exception(exc: Exception, scope: Scope) -> None:
+    """Litestar ``after_exception`` hook: record 5xx causes with the request trace id.
+
+    Client errors (4xx, including validation) are expected traffic and stay silent.
+    """
+    if isinstance(exc, HTTPException) and exc.status_code < 500:
+        return
+    logger.error(
+        "request_failed",
+        exc_info=exc,
+        extra={"method": scope.get("method"), "path": scope.get("path")},
+    )
 
 
 def trace_id_from_request(request: Request) -> TraceId:

@@ -43,6 +43,21 @@ def test_settings_rejects_invalid_upstream_url(monkeypatch: pytest.MonkeyPatch) 
         Settings()
 
 
+def test_settings_log_level_defaults_to_info() -> None:
+    assert Settings().log_level == "INFO"
+
+
+def test_settings_log_level_normalizes_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LOG_LEVEL", "debug")
+    assert Settings().log_level == "DEBUG"
+
+
+def test_settings_rejects_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LOG_LEVEL", "loud")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
 def test_legacy_config_helpers_use_cached_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

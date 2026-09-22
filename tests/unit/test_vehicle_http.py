@@ -1,8 +1,10 @@
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from typing import Any
 
 from litestar.testing import TestClient
 
+from onboarding_flow.app import create_app
 from onboarding_flow.envelope import ErrorCode
 from onboarding_flow.memory_upstream import MemoryUpstream, failure_upstream
 from onboarding_flow.schemas import VehicleData
@@ -81,6 +83,52 @@ def test_trace_id_generated_when_missing(
     trace = response.json()["trace_id"]
     assert trace
     assert response.headers.get("x-trace-id") == trace
+
+
+def test_request_logs_carry_request_trace_id(
+    api_client: TestClient,
+    assignment_plate: str,
+    json_logs: list[dict[str, Any]],
+) -> None:
+    api_client.post(
+        "/vehicle-info",
+        json={"license_plate": assignment_plate},
+        headers={"X-Trace-ID": "client-trace-77"},
+    )
+
+    completed = [line for line in json_logs if line["message"] == "vehicle_lookup_completed"]
+    assert len(completed) == 1
+    assert completed[0]["trace_id"] == "client-trace-77"
+
+
+def test_unhandled_upstream_exception_logs_error_with_trace_id(
+    assignment_plate: str,
+    json_logs: list[dict[str, Any]],
+) -> None:
+    upstream = MemoryUpstream(exc=RuntimeError("adapter exploded"))
+    with TestClient(app=create_app(upstream=upstream), raise_server_exceptions=False) as client:
+        response = client.post(
+            "/vehicle-info",
+            json={"license_plate": assignment_plate},
+            headers={"X-Trace-ID": "client-trace-500"},
+        )
+
+    assert response.status_code == 500
+    errors = [line for line in json_logs if line["severity"] == "ERROR"]
+    assert len(errors) == 1
+    assert errors[0]["message"] == "request_failed"
+    assert errors[0]["trace_id"] == "client-trace-500"
+    assert "RuntimeError: adapter exploded" in errors[0]["stack_trace"]
+
+
+def test_invalid_plate_does_not_log_error(
+    api_client: TestClient,
+    json_logs: list[dict[str, Any]],
+) -> None:
+    response = api_client.post("/vehicle-info", json={"license_plate": "bad-plate"})
+
+    assert response.status_code in {400, 422}
+    assert not [line for line in json_logs if line["severity"] == "ERROR"]
 
 
 def test_trace_id_invalid_header_is_replaced(

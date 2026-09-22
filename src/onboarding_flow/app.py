@@ -10,7 +10,7 @@ from litestar.openapi.config import OpenAPIConfig
 from onboarding_flow.config import get_settings
 from onboarding_flow.encore_upstream import EncoreUpstream
 from onboarding_flow.logging_config import configure_logging
-from onboarding_flow.observability import TraceMiddleware
+from onboarding_flow.observability import TraceMiddleware, log_unhandled_exception
 from onboarding_flow.upstream import UpstreamPort
 from onboarding_flow.vehicle import VehicleController
 
@@ -33,7 +33,7 @@ async def health() -> dict[str, str]:
 
 def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
     """Return the configured application for tests and ASGI servers."""
-    configure_logging()
+    configure_logging(get_settings().log_level)
     injected_upstream = upstream
 
     @asynccontextmanager
@@ -60,6 +60,10 @@ def create_app(*, upstream: UpstreamPort | None = None) -> Litestar:
         lifespan=[lifespan],
         middleware=[TraceMiddleware()],
         openapi_config=OPENAPI_CONFIG,
+        # Litestar's default LoggingConfig would install its own handlers;
+        # unhandled exceptions are logged through our JSON pipeline instead.
+        logging_config=None,
+        after_exception=[log_unhandled_exception],
     )
 
 

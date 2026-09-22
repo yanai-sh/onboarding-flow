@@ -1,4 +1,5 @@
-from unittest.mock import patch
+import json
+from typing import Any
 
 import pytest
 
@@ -46,36 +47,40 @@ async def test_lookup_maps_upstream_failures(
 
 
 @pytest.mark.asyncio
-async def test_lookup_logs_masked_plate_not_raw_value(assignment_vehicle) -> None:
+async def test_lookup_logs_masked_plate_not_raw_value(
+    assignment_vehicle,
+    json_logs: list[dict[str, Any]],
+) -> None:
     plate = assignment_vehicle.license_plate
     upstream = success_upstream(assignment_vehicle)
-    with patch("onboarding_flow.vehicle_lookup.logger.info") as log_info:
-        await lookup_vehicle_info(plate, upstream, "trace-log")
+    await lookup_vehicle_info(plate, upstream, "trace-log")
 
-    log_info.assert_called_once()
-    extra = log_info.call_args.kwargs["extra"]
-    assert extra["plate_mask"] == "****5678"
-    assert extra["trace_id"] == "trace-log"
-    assert plate not in extra.values()
+    [event] = [line for line in json_logs if line["message"] == "vehicle_lookup_completed"]
+    assert event["plate_mask"] == "****5678"
+    assert event["trace_id"] == "trace-log"
+    assert event["success"] is True
+    assert plate not in json.dumps(json_logs)
 
 
 @pytest.mark.parametrize(
-    "kind",
+    ("kind", "expected_code"),
     [
-        UpstreamFailureKind.NOT_FOUND,
-        UpstreamFailureKind.TIMEOUT,
+        (UpstreamFailureKind.NOT_FOUND, "VEHICLE_NOT_FOUND"),
+        (UpstreamFailureKind.TIMEOUT, "UPSTREAM_TIMEOUT"),
     ],
 )
 @pytest.mark.asyncio
 async def test_lookup_logs_failure_outcome(
     assignment_vehicle,
     kind: UpstreamFailureKind,
+    expected_code: str,
+    json_logs: list[dict[str, Any]],
 ) -> None:
     upstream = failure_upstream(kind)
     plate = assignment_vehicle.license_plate
-    with patch("onboarding_flow.vehicle_lookup.logger.info") as log_info:
-        await lookup_vehicle_info(plate, upstream, "trace-log")
+    await lookup_vehicle_info(plate, upstream, "trace-log")
 
-    extra = log_info.call_args.kwargs["extra"]
-    assert extra["success"] is False
-    assert extra["error_code"] is not None
+    [event] = [line for line in json_logs if line["message"] == "vehicle_lookup_completed"]
+    assert event["success"] is False
+    assert event["error_code"] == expected_code
+    assert plate not in json.dumps(json_logs)
