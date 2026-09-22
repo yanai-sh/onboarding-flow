@@ -1,0 +1,31 @@
+# Version control
+.git
+.gitignore
+.github
+
+# IDEs & editor workspace metadata
+.cursor/
+.vscode/
+.idea/
+.DS_Store
+
+# Python environment & build artifacts
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Documentation & local strategy guides
+ARCHITECTURE.md
+TASKS.md
+DEV_GUIDE.md
+tests/
+docs/
+
+# Environment configs
+.env
