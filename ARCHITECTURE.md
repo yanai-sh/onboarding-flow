@@ -89,9 +89,11 @@ by tests before implementation is considered complete.
   status mapping, and response parsing. Tests replace this adapter at the
   seam; tests do not call the real upstream.
 - **Logging middleware**: creates or accepts `X-Trace-ID` (invalid client
-  values are replaced with a generated id), binds validated `TraceId` to
-  request state for trace ids. Handlers read
-  trace ids via `trace_id_from_request`; they do not mint new ids.
+  values are replaced with a generated id), stores the validated `TraceId`
+  on request state, and sets a `ContextVar` that a logging filter copies onto
+  every record emitted during the request. Handlers read trace ids via
+  `trace_id_from_request`; they do not mint new ids. An `after_exception`
+  hook logs 5xx causes with the same trace id; 4xx stay silent.
 
 **Invalid license plates:** Pydantic validation on `VehicleRequest` fails at
 the Litestar ingress seam with HTTP **4xx** (framework validation body). The
@@ -111,11 +113,18 @@ load.
 
 Every expected upstream transport, timeout, status, and parse failure is
 converted into the typed envelope on HTTP 200. Proxy ingress validation
-failures use framework 4xx instead of the envelope (see Module seams). Logs
-are structured NDJSON and contain the trace ID, route, outcome, error code,
-and latency. Raw license plates,
-customer names, phone numbers, and email addresses are never logged; a plate
-may be represented by a deterministic partial mask such as `****5678`.
+failures use framework 4xx instead of the envelope (see Module seams).
+
+Logs are single-line JSON on stdout with Cloud Logging field names. Four
+events cover the service: `app_started` (adapter, upstream host, timeout),
+`upstream_request_failed` (failure kind, status code, exception class,
+duration; not-found is a business outcome and is not a warning),
+`vehicle_lookup_completed` (outcome, error code, masked plate, duration), and
+`request_failed` (5xx with stack trace). Every record carries the request
+`trace_id`. Raw license plates, response bodies, customer names, phone
+numbers, and email addresses are never logged; a plate is represented by a
+deterministic partial mask such as `****5678`. See
+`docs/adr/0002-httpx-stdlib-logging-granian-env.md`.
 
 The proxy is stateless and does not persist applicant or vehicle data. Trace
 IDs are correlation metadata, not authentication. Authentication, rate
@@ -124,12 +133,14 @@ post-assignment concerns.
 
 ## Cloud Run shape
 
-The existing multi-stage Docker intent remains: `uv` resolves locked
-dependencies, the runtime uses `python:3.14-slim`, the process runs as
-unprivileged `appuser`, and Granian binds the ASGI app to `0.0.0.0:$PORT`
-(8080 by default). The implementation phase must verify the Dockerfile,
-health behavior, and image startup rather than treating the scaffold as
-complete.
+Multi-stage Docker build: `uv` resolves locked dependencies, the runtime uses
+`python:3.14-slim`, the process runs as unprivileged `appuser`, and Granian
+binds the ASGI app to `0.0.0.0:$PORT` (8080 by default). Granian settings are
+`GRANIAN_*` environment defaults in the image (one worker, ASGI interface,
+no WebSockets, no access log, 8s kill timeout inside Cloud Run's 10s SIGTERM
+grace); `LOG_LEVEL` and `GRANIAN_WORKERS_KILL_TIMEOUT` are overridable from
+Terraform. `exec granian` keeps the server as PID 1 so SIGTERM runs lifespan
+shutdown and closes the HTTP client.
 
 ## Insait flow boundary
 
