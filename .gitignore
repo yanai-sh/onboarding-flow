@@ -9,14 +9,24 @@ pytest-cache-files-*/
 build/
 dist/
 wheels/
+coverage.xml
+.coverage
+htmlcov/
 
 # Virtual environments
-.venv
+.venv/
 .env
+.env.*
+!.env.example
 
 # Cursor
 .cursor/*
 !.cursor/rules/
+.scratch/
 
-# Docs
+# Local-only assignment source material
 docs/FDE_Home_Assignment.pdf
+
+# Local tooling and OS files
+.DS_Store
+*.log
