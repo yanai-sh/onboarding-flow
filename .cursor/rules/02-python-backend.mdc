@@ -9,7 +9,7 @@ globs: "*.py"
 - **Framework:** `litestar` (utilizing Domain-Driven Design via class-based Controllers).
 - **Validation:** `pydantic` v2
 - **Networking:** `httpx.AsyncClient` for outbound calls, one client per process created in the app lifespan. HTTP/3 is out of scope (see `docs/adr/0002`).
-- **Serving:** `granian` (ASGI) configured via `GRANIAN_*` env in the Dockerfile: one worker, lifespan enabled, no WebSockets, no access log.
+- **Serving:** `granian` configured via `GRANIAN_*` env in the Dockerfile: `asgi` interface (lifespan is Granian's ASGI default; do not switch to `asginl`), one worker, no WebSockets, no access log.
 - **Observability:** stdlib `logging` through `onboarding_flow.logging_config` (JSON lines, Cloud Logging field names). Use `logging.getLogger(__name__)` and pass structured fields via `extra=`; the request `trace_id` is attached automatically by the handler filter. Never log request/response bodies or raw plates.
 
 ## 2. Typing & Contracts

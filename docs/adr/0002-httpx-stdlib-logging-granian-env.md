@@ -27,8 +27,9 @@ not be changed without rebuilding the image.
 
 1. **Outbound HTTP uses `httpx.AsyncClient`**, created once in the Litestar
    lifespan and closed on shutdown. `TimeoutException` maps to
-   `UPSTREAM_TIMEOUT`, any other `TransportError` to `UPSTREAM_UNAVAILABLE`.
-   HTTP/3 is out of scope for this service.
+   `UPSTREAM_TIMEOUT`; every other `RequestError` (transport, decoding,
+   redirect) maps to `UPSTREAM_UNAVAILABLE` so no upstream fault leaves the
+   envelope. HTTP/3 is out of scope for this service.
 2. **Logging is stdlib `logging` with a JSON formatter** on stdout using
    Cloud Logging field names (`severity`, `time`, `message`, `stack_trace`).
    `TraceMiddleware` sets a `ContextVar`; a handler filter copies it onto
@@ -39,12 +40,15 @@ not be changed without rebuilding the image.
    handler; Granian configures logging before loading the app, so the app's
    configuration wins for worker-side lines. Main-process Granian lines remain
    plain text, which Cloud Logging ingests as `textPayload`.
-3. **Four events, no access log.** `app_started` (adapter, upstream host,
-   timeout, version), `upstream_request_failed` (kind, status code, exception
-   class, duration; not emitted for not-found), `vehicle_lookup_completed`
-   (outcome, masked plate, duration), and `request_failed` (5xx with stack
-   trace). Cloud Run already records every request at the edge. Response
-   bodies and raw plates are never logged.
+3. **Five events, no access log.** `app_started` (adapter, upstream host,
+   timeout, version), `app_stopping`, `upstream_request_failed` (kind,
+   status code, exception class, duration; not emitted for not-found),
+   `vehicle_lookup_completed` (outcome, error code, masked plate, duration),
+   and `request_failed` (5xx with method, path, stack trace). The field list
+   of record is the table in `ARCHITECTURE.md`. Cloud Run already records
+   every request at the edge. Response bodies and raw plates are never
+   logged; stack traces render exception messages verbatim, so raising code
+   must not embed request data.
 4. **Granian settings live as `GRANIAN_*` image environment defaults**, not
    `CMD` flags. Image facts (`asgi` interface, `0.0.0.0`, one worker, no
    WebSockets, no access log) are fixed by the image; deployment facts

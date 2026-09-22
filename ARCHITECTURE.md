@@ -115,15 +115,22 @@ Every expected upstream transport, timeout, status, and parse failure is
 converted into the typed envelope on HTTP 200. Proxy ingress validation
 failures use framework 4xx instead of the envelope (see Module seams).
 
-Logs are single-line JSON on stdout with Cloud Logging field names. Four
-events cover the service: `app_started` (adapter, upstream host, timeout),
-`upstream_request_failed` (failure kind, status code, exception class,
-duration; not-found is a business outcome and is not a warning),
-`vehicle_lookup_completed` (outcome, error code, masked plate, duration), and
-`request_failed` (5xx with stack trace). Every record carries the request
-`trace_id`. Raw license plates, response bodies, customer names, phone
-numbers, and email addresses are never logged; a plate is represented by a
-deterministic partial mask such as `****5678`. See
+Logs are single-line JSON on stdout with Cloud Logging field names. Five
+events cover the service:
+
+| Event | Level | Fields |
+|---|---|---|
+| `app_started` | INFO | `upstream_adapter`, `upstream_host`, `upstream_timeout_seconds`, `version` |
+| `app_stopping` | INFO | — |
+| `upstream_request_failed` | WARNING | `kind`, `status_code`, `exception` (class name), `duration_ms`; not emitted for not-found, which is a business outcome |
+| `vehicle_lookup_completed` | INFO | `success`, `error_code`, `plate_mask`, `duration_ms` |
+| `request_failed` | ERROR | `method`, `path`, `stack_trace`; 5xx only, client errors stay silent |
+
+Every record emitted inside a request carries its `trace_id`. Raw license
+plates, response bodies, customer names, phone numbers, and email addresses
+are never logged; a plate is represented by a deterministic partial mask such
+as `****5678`. Stack traces render exception messages verbatim, so code that
+raises must not embed request data in messages. See
 `docs/adr/0002-httpx-stdlib-logging-granian-env.md`.
 
 The proxy is stateless and does not persist applicant or vehicle data. Trace
