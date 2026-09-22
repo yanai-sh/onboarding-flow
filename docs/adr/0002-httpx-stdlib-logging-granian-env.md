@@ -4,6 +4,12 @@
 
 Accepted
 
+Update (2026-09-22): the decision stands. Two details changed later.
+`upstream_request_failed` now carries `error_code` instead of `kind`. The
+timeout is a total budget enforced with `asyncio.timeout` around the httpx
+call, so `UPSTREAM_TIMEOUT` covers both that budget and httpx
+`TimeoutException`. `ARCHITECTURE.md` holds the current field list.
+
 ## Context
 
 A dependency audit found two runtime dependencies whose documented

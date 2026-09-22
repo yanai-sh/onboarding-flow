@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0003: invalid plates now return `INVALID_REQUEST` in the
+HTTP 200 envelope; only structural faults stay framework 4xx.
 
 ## Context
 
