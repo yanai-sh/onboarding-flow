@@ -4,7 +4,9 @@
 
 This repository is a focused solo take-home assignment for a car-insurance
 onboarding flow. Prefer a small, explainable implementation that demonstrates
-production judgment over novelty or speculative infrastructure.
+production judgment over novelty or speculative infrastructure. Read
+`CONTEXT.md`, `ARCHITECTURE.md`, `ROADMAP.md`, and `TODO.md` before changing
+application behavior; they define the assignment-specific scope and contracts.
 
 The system has two deliverables:
 
@@ -15,6 +17,13 @@ Keep the boundary between code the agent can change and actions that require
 the Insait UI, account access, or a recorded submission explicit.
 
 ## Agent skills
+
+For implementation, use the local `tdd`, `codebase-design`, and `implement`
+skills together: agree on public seams, build tracer-bullet behavior, and
+verify it through the highest public interface. Use `writing-for-agents` when
+changing this file or other agent-facing documentation. The Insait flow is a
+manual platform step; document its handoff and never imply that repository
+code automated the Insait UI.
 
 ### Issue tracker
 

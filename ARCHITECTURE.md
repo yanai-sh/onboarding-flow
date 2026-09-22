@@ -1,82 +1,133 @@
 # Planned Architecture and Design Decisions
 
-This document describes the target architecture for the onboarding service.
-The repository currently contains a health-check ASGI scaffold; the vehicle
-proxy and Insait flow remain planned work.
+The repository is a scaffold for the Encore AI car-insurance assignment. The
+implementation target is one small vertical slice: a stateless vehicle lookup
+proxy plus a documented handoff for the manually built Insait flow.
 
-## 1. Target System Topology
+## System topology
+
 ```mermaid
-graph TD
-    A[Insait Conversational Node] -->|POST /vehicle-info| B[Litestar Cloud Run Proxy]
-    B -->|Mask PII and bind trace ID| C[Structlog Middleware]
-    C -->|Async POST via niquests| D[Encore Upstream Webhook]
-    D -->|Success or structured error| B
-    B -->|Railway-oriented JSON envelope| A
+graph LR
+    A[Insait Conversation Flow] -->|POST /vehicle-info| B[Litestar app]
+    B --> C[Validation and response envelope]
+    C --> D[Injected upstream adapter]
+    D -->|niquests AsyncSession| E[Encore vehicle-info endpoint]
+    E --> D
+    B --> F[structlog: trace ID + masked plate]
+    B -->|typed success or error| A
 ```
 
-## 2. Planned API Proxy and Anti-Corruption Layer
+The current code contains only `/health`; all vehicle behavior below is
+planned.
 
-### Framework
+## Service contract
 
-**Litestar** will provide structured controller patterns and Pydantic v2 integration, keeping the proxy boundary explicit and maintainable.
+### Inbound request
 
-### Runtime
+`POST /vehicle-info` accepts JSON with one field:
 
-**Granian** is the planned Rust-based ASGI runtime for asynchronous I/O and efficient resource usage on Google Cloud Run.
+```json
+{"license_plate": "12345678"}
+```
 
-### HTTP Client
+The proxy trims surrounding whitespace, canonicalizes the plate to uppercase,
+and accepts a non-empty ASCII alphanumeric value within a documented,
+defensive maximum length. Invalid input is rejected at the proxy seam and
+never reaches the upstream. The service does not assume a country-specific
+plate length because the assignment does not define one.
 
-**niquests** is the planned HTTP client for communication with the upstream webhook.
+### Response envelope
 
-### Resilience
-
-The proxy will implement a generic railway-oriented response envelope:
+The public response is a generic Pydantic model:
 
 ```text
-APIResponse[T]
+APIResponse[T] = {
+  success: bool,
+  data: T | null,
+  error_code: str | null,
+  message: str | null,
+  trace_id: str
+}
 ```
 
-All upstream failures—including `404`, `500`, and timeout responses—will be converted into a typed JSON contract. This will prevent unhandled upstream exceptions from propagating into the Insait conversational graph.
+Successful data is the assignment's vehicle shape: `license_plate`,
+`manufacturer`, `model`, `year`, and `color`. Error responses are still
+structured JSON and use HTTP 200 so the Insait graph can route on
+`success`/`error_code` without an unmapped upstream exception. Proxy input
+validation may use the framework's normal 4xx handling; upstream and adapter
+failures must never escape as an unstructured 5xx.
 
-## 3. Planned Observability and Security
+Initial error codes:
 
-Incoming requests will be assigned an `X-Trace-ID`, which will be bound to the structured logging context through `structlog`.
+- `INVALID_REQUEST` — proxy validation failed.
+- `VEHICLE_NOT_FOUND` — upstream returned not found.
+- `UPSTREAM_TIMEOUT` — the bounded request timed out.
+- `UPSTREAM_UNAVAILABLE` — connection, transport, or upstream 5xx failure.
+- `UPSTREAM_INVALID_RESPONSE` — upstream returned an unusable payload.
 
-Pydantic validators will apply deterministic PII masking before sensitive data reaches application logs.
+The exact upstream status-to-code mapping and user-safe messages are covered
+by tests before implementation is considered complete.
 
-### Production Roadmap
+## Module seams
 
-At enterprise scale, the proxy can be extended with:
+- **HTTP controller**: owns the Litestar request/response contract and
+  delegates vehicle lookup.
+- **Vehicle lookup interface**: accepts a validated plate and returns a typed
+  success or failure result. The controller receives this dependency through
+  Litestar dependency injection.
+- **niquests adapter**: owns the `AsyncSession`, URL, JSON encoding, timeout,
+  status mapping, and response parsing. Tests replace this adapter at the
+  seam; tests do not call the real upstream.
+- **Logging middleware**: creates or accepts `X-Trace-ID`, binds it to
+  `structlog` context, and clears context after the request.
 
-- An LLM-backed schema firewall for redacting unstructured conversational input
-- OpenTelemetry instrumentation and export
-- Centralized log aggregation and trace analysis
-- Additional canonicalization of extracted PII before persistence
+Dependencies are created at application composition time, not inside request
+handlers. The default adapter uses `niquests.AsyncSession` and a strict
+five-second total timeout. No automatic retry is planned for this assignment:
+the user-facing flow must remain bounded and retries could amplify upstream
+load.
 
-## 4. Planned Insait Graph Strategy
+## Resilience and PII
 
-### Node Footprint
+Every expected transport, timeout, status, parse, and validation failure is
+converted into the typed envelope. Logs are structured NDJSON and contain the
+trace ID, route, outcome, error code, and latency. Raw license plates,
+customer names, phone numbers, and email addresses are never logged; a plate
+may be represented by a deterministic partial mask such as `****5678`.
 
-The conversational flow is intended to remain lightweight, with a six-node architecture mapped to the assignment's five user-facing stages.
+The proxy is stateless and does not persist applicant or vehicle data. Trace
+IDs are correlation metadata, not authentication. Authentication, rate
+limiting, caching, OpenTelemetry export, and semantic PII firewalls are
+post-assignment concerns.
 
-### Routing
+## Cloud Run shape
 
-Deterministic edges will handle hard business conditions such as API success flags and validation results. LLM-based exits will handle flexible conversational interpretation and unstructured user input.
+The existing multi-stage Docker intent remains: `uv` resolves locked
+dependencies, the runtime uses `python:3.14-slim`, the process runs as
+unprivileged `appuser`, and Granian binds the ASGI app to `0.0.0.0:$PORT`
+(8080 by default). The implementation phase must verify the Dockerfile,
+health behavior, and image startup rather than treating the scaffold as
+complete.
 
-### State Mutability
+## Insait flow boundary
 
-Conversational loops in the summary and confirmation stages will allow users to revise previously supplied entities—including contact details, vehicle information, and add-ons—without terminating the flow.
+The PDF describes five user-facing stages. Keep the graph at six or fewer
+nodes:
 
-## 5. Planned Edge-Case Handling
+1. **Opening** — greet and save `insurance_type` as Comprehensive or
+   Mandatory.
+2. **Vehicle** — save `license_plate`, call the API, save returned vehicle
+   fields, and branch on `success`; distinguish not found, invalid request,
+   timeout, and unavailable responses.
+3. **Applicant** — save and validate `full_name`, `phone`, and `email`.
+4. **Coverage** — for Comprehensive only, save multi-select options:
+   windshield, extended third-party, and replacement vehicle.
+5. **Summary** — display all saved details, obtain confirmation, and loop back
+   to the relevant conversation state when the applicant requests a change.
+6. **Completion** — confirm the onboarding handoff (not policy issuance).
 
-### Upstream Timeout Handling
-
-A `504 Gateway Timeout` from the Encore webhook will be distinguished from other errors, allowing the Insait graph to route the user to a fallback manual-collection path.
-
-### Schema Rigidity
-
-A strict seven- or eight-character license-plate constraint limits international scalability. The upstream webhook should support ISO-compatible international string formats, with geographic normalization delegated to the semantic layer.
-
-### PII Analytics Gap
-
-Because the planned flow avoids explicit UI forms, entities will be extracted dynamically from natural-language input. A future semantic firewall could normalize extracted PII into canonical schemas before it is persisted or forwarded to downstream systems.
+Conversation nodes plus save tools handle natural language and out-of-order
+answers. Deterministic expression edges handle insurance type, API success,
+error codes, and coverage branching. The Collect Node is intentionally
+excluded. Creating, deploying, testing, linking, and recording this flow are
+manual platform steps requiring human Insait access.

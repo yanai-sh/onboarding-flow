@@ -1,28 +1,63 @@
-# Strategic Roadmap: Onboarding Flow Proxy
+# Implementation Roadmap
 
-## Phase 1: Core Anti-Corruption Layer (Milestone 1)
-- **Objective:** Establish the high-performance Litestar service layer to safely proxy inbound conversational requests from the Insait AI graph to the upstream Encore webhook.
-- **Key Deliverables:**
-  - Standardized generic `APIResponse[T]` envelope for deterministic client consumption.
-  - Robust error-mapping isolating network timeouts, validation failures, and upstream 404s.
-  - Strict Pydantic v2 data validation and PII masking pipeline.
+The roadmap is intentionally a short dependency sequence. A phase is complete
+only when its behavior is tested and the relevant acceptance evidence exists.
 
-## Phase 2: Cloud-Native Containerization (Milestone 2)
-- **Objective:** Package the service into an optimized OCI container built for zero-trust, stateless execution on Google Cloud Run.
-- **Key Deliverables:**
-  - Multi-stage Docker build utilizing Astral's `uv` for sub-second dependency layering.
-  - Hardened unprivileged runtime (`appuser`) running on `python:3.14-slim`.
-  - Granian ASGI server binding to port 8080 with pre-compiled bytecode optimization.
+## Phase 0: Planning baseline
 
-## Phase 3: Conversational Orchestration & Hardening (Milestone 3)
-- **Objective:** Integrate the proxy into the Insait platform canvas (Nodes 1–6) and ensure enterprise-grade resilience.
-- **Key Deliverables:**
-  - Deterministic routing edges handling API success/error payloads.
-  - Graceful fallback paths for upstream gateway timeouts (preventing conversational dead-ends).
-  - State mutability loops allowing users to modify data fields prior to final submission.
+**Status:** ready for implementation.
 
-## Phase 4: Production Scale (Post-Assignment)
-- **Objective:** Expand telemetry and security guardrails for enterprise traffic.
-- **Key Deliverables:**
-  - OpenTelemetry (OTel) trace propagation exported to centralized SIEM tools.
-  - Semantic LLM firewall integration (e.g., DataFog) for unstructured PII scrubbing.
+- Read the assignment and record its vocabulary in `CONTEXT.md`.
+- Keep the service/Insait ownership boundary explicit.
+- Treat the current health-only app and existing container files as scaffold,
+  not completed milestones.
+
+## Phase 1: Vehicle lookup vertical slice
+
+**Blocked by:** Phase 0.
+
+Build the smallest demonstrable path: validate a plate, call the upstream
+through an injected adapter, map the result, and serve `POST /vehicle-info`.
+Use Litestar, Pydantic, and `niquests.AsyncSession`; preserve `/health`.
+
+**Exit evidence:** public HTTP tests cover success, invalid input, not found,
+timeout, transport failure, upstream 5xx, and malformed payloads.
+
+## Phase 2: Resilience and observability
+
+**Blocked by:** Phase 1.
+
+Add the five-second timeout, typed error envelope for expected upstream
+failures, trace-ID middleware, structlog context cleanup, and deterministic PII
+masking. Keep dependencies injected at app composition time.
+
+**Exit evidence:** logs and response tests demonstrate trace correlation,
+safe fields, and no unhandled upstream exception.
+
+## Phase 3: Cloud Run packaging
+
+**Blocked by:** Phase 2.
+
+Verify the locked `uv` build, multi-stage `python:3.14-slim` image,
+unprivileged runtime, Granian ASGI startup, and `$PORT`/8080 behavior.
+
+**Exit evidence:** repository checks pass and the image starts the health
+endpoint locally when Docker is available.
+
+## Phase 4: Manual Insait flow
+
+**Blocked by:** Phase 3 and approved Insait access.
+
+The human creates the Conversation Flow Agent, connects the deployed proxy,
+configures deterministic branches and conversational save tools, tests the
+required paths, and records the submission. The graph remains six or fewer
+nodes and excludes the Collect Node.
+
+**Exit evidence:** flow link, workspace/agent name, debug-tested happy and
+failure paths, correction loop, and approximately three-minute recording.
+
+## Post-assignment exclusions
+
+Persistence, policy pricing/issuance, authentication, rate limiting, caching,
+automatic retries, OpenTelemetry export, semantic PII firewalls, and Insait UI
+automation are deliberately excluded from this take-home slice.
