@@ -1,17 +1,10 @@
-# Core: Auto-detect text files and strictly enforce LF normalization (Critical for WSL/Docker parity)
 * text=auto eol=lf
 
-# Explicitly declare text types
-*.py text eol=lf
-*.md text eol=lf
-*.sh text eol=lf
-Dockerfile text eol=lf
+*.py text eol=lf diff=python
+*.md text eol=lf diff=markdown
 *.toml text eol=lf
 *.yaml text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
 
-# Custom Diff Drivers (Improves `git diff` readability in CLI and GitHub)
-*.py diff=python
-*.md diff=markdown
-
-# Linguist Overrides: Hide generated lockfiles from GitHub's repository language statistics
 uv.lock linguist-generated=true

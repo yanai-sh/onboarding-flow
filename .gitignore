@@ -1,32 +1,41 @@
-# Python & Bytecode
+# Python
 __pycache__/
-.pytest_cache/
-.ruff_cache/
-pytest-cache-files-*/
-*.egg-info
-*$py.class
 *.py[oc]
+*$py.class
+*.egg-info/
 build/
 dist/
 wheels/
-coverage.xml
+
+# Test & lint caches
+.pytest_cache/
+.ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 
-# Virtual environments
+# Environment
 .venv/
 .env
 .env.*
 !.env.example
 
-# Cursor
+# Terraform (local state; never commit secrets)
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfvars
+!infra/terraform/terraform.tfvars.example
+
+# Local workspace
 .cursor/*
 !.cursor/rules/
 .scratch/
 
-# Local-only assignment source material
+# Assignment source (local only)
 docs/FDE_Home_Assignment.pdf
 
-# Local tooling and OS files
+# OS & logs
 .DS_Store
 *.log

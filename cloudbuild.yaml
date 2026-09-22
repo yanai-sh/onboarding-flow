@@ -1,0 +1,27 @@
+# Cloud Build: BuildKit via buildx (required for Dockerfile cache/bind mounts).
+# Usage (repo root):
+#   gcloud builds submit --region=us-central1 --config=cloudbuild.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/PROJECT/onboarding-flow/onboarding-flow:latest
+steps:
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -ceux
+      - |
+        docker buildx version
+        docker buildx create --name cloudbuild --driver docker-container --use 2>/dev/null \
+          || docker buildx use cloudbuild
+        docker buildx inspect --bootstrap
+        docker buildx build \
+          --platform linux/amd64 \
+          --provenance=false \
+          --sbom=false \
+          --tag "${_IMAGE}" \
+          --push \
+          .
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _IMAGE: us-central1-docker.pkg.dev/encore-fde-yanai/onboarding-flow/onboarding-flow:latest

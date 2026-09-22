@@ -1,31 +1,36 @@
-# Version control
+# Version control & CI
 .git
 .gitignore
 .github
 
-# IDEs & editor workspace metadata
-.cursor/
-.vscode/
-.idea/
+# Editor & local workspace
+.cursor
+.vscode
+.idea
+.scratch
 .DS_Store
 
-# Python environment & build artifacts
-.venv/
-__pycache__/
+# Python (not needed in the runtime image)
+.venv
+__pycache__
 *.py[cod]
 *$py.class
-.pytest_cache/
-.ruff_cache/
-dist/
-build/
-*.egg-info/
+.pytest_cache
+.ruff_cache
+dist
+build
+*.egg-info
 
-# Documentation & local strategy guides
+# Docs, tests, and planning (runtime uses packaged src only)
+tests
+docs
 ARCHITECTURE.md
-TASKS.md
-DEV_GUIDE.md
-tests/
-docs/
+ROADMAP.md
+TODO.md
+CONTEXT.md
+AGENTS.md
+# README.md is required by uv_build (pyproject readme = "README.md")
 
-# Environment configs
+# Secrets
 .env
+.env.*
