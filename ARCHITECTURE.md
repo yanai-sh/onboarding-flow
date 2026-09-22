@@ -70,16 +70,30 @@ by tests before implementation is considered complete.
 
 ## Module seams
 
-- **HTTP controller**: owns the Litestar request/response contract and
-  delegates vehicle lookup.
-- **Vehicle lookup interface**: accepts a validated plate and returns a typed
-  success or failure result. The controller receives this dependency through
-  Litestar dependency injection.
+- **HTTP controller**: Litestar adapter for `POST /vehicle-info`; resolves
+  `UpstreamPort` from `app.state`, reads trace id from observability helpers,
+  delegates to the vehicle lookup module.
+- **Vehicle lookup module**: orchestrates `UpstreamPort.fetch_vehicle`, maps
+  through the response envelope module, and emits PII-safe completion logs.
+- **Request schemas**: `VehicleRequest` normalization and validation (ingress).
+- **Response envelope module**: `VehicleInfoResponse`, error codes, builders,
+  and mapping from `UpstreamOutcome` to the Insait-facing JSON contract.
+- **Upstream port**: accepts a validated plate and returns a typed success or
+  failure outcome. Wired on `app.state` at composition time.
 - **niquests adapter**: owns the `AsyncSession`, URL, JSON encoding, timeout,
   status mapping, and response parsing. Tests replace this adapter at the
   seam; tests do not call the real upstream.
 - **Logging middleware**: creates or accepts `X-Trace-ID`, binds it to
-  `structlog` context, and clears context after the request.
+  `structlog` context, and clears context after the request. Handlers read
+  trace ids via `trace_id_for_request`; they do not mint new ids.
+
+**Invalid license plates:** Pydantic validation on `VehicleRequest` fails at
+the Litestar ingress seam with HTTP **4xx** (framework validation body). The
+upstream port is not called. `ErrorCode.INVALID_REQUEST` is documented for
+envelope routing but is **not** returned on that path today. Insait should
+pre-validate plates and/or branch on HTTP client errors; upstream and adapter
+outcomes continue to use HTTP **200** with `success` / `error_code`. See
+`docs/adr/0001-proxy-validation-4xx.md`.
 
 Dependencies are created at application composition time, not inside request
 handlers. The default adapter uses `niquests.AsyncSession` and a strict
@@ -89,9 +103,11 @@ load.
 
 ## Resilience and PII
 
-Every expected transport, timeout, status, parse, and validation failure is
-converted into the typed envelope. Logs are structured NDJSON and contain the
-trace ID, route, outcome, error code, and latency. Raw license plates,
+Every expected upstream transport, timeout, status, and parse failure is
+converted into the typed envelope on HTTP 200. Proxy ingress validation
+failures use framework 4xx instead of the envelope (see Module seams). Logs
+are structured NDJSON and contain the trace ID, route, outcome, error code,
+and latency. Raw license plates,
 customer names, phone numbers, and email addresses are never logged; a plate
 may be represented by a deterministic partial mask such as `****5678`.
 

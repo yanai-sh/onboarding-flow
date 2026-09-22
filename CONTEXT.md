@@ -19,7 +19,9 @@ conversation state and orchestration.
 - **Upstream**: the supplied Encore vehicle-info endpoint. Its availability,
   response shape, and status codes are outside this repository's control.
 - **Response envelope**: the stable JSON contract returned by the proxy for
-  both successful data and expected errors.
+  successful vehicle data and expected upstream or adapter failures (HTTP 200).
+  Invalid proxy ingress input uses framework HTTP client errors instead; see
+  `ARCHITECTURE.md` Module seams.
 - **Conversation flow**: the manually configured Insait graph that collects
   applicant details, calls the proxy, supports corrections, and reaches a
   final confirmation.
