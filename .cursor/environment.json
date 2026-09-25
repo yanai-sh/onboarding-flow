@@ -1,0 +1,18 @@
+{
+  "name": "onboarding-flow vehicle proxy",
+  "user": "ubuntu",
+  "install": "curl -LsSf https://astral.sh/uv/install.sh | sh && \"$HOME/.local/bin/uv\" sync --locked",
+  "terminals": [
+    {
+      "name": "granian",
+      "command": "\"$HOME/.local/bin/uv\" run granian --interface asgi --host 0.0.0.0 --port 8080 onboarding_flow.app:app",
+      "description": "Serves the vehicle-info proxy on http://0.0.0.0:8080 (POST /vehicle-info, GET /health, Swagger at /schema/swagger)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "vehicle proxy",
+      "port": 8080
+    }
+  ]
+}
