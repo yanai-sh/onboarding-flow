@@ -55,8 +55,8 @@ stuck even after a rollback. Cancel them and start new runs.
    (about 3 s on Sep 23); DIAG-02 runs one lookup with the `test_url` override. If DIAG-01 hangs,
    the runner itself is stuck; if only DIAG-02 hangs, the Lookup path is.
 3. Create folder `01-smoke`, import `01-smoke.csv` into it, and run it.
-4. If SMK-01 shows an execution error, the cause is the agent or runner: publish the agent, run
-   one live Test Agent chat, check the Lookup tool URL and the tool schema's `required` field,
-   and stop there.
+4. If SMK-01 shows an execution error or stalls, the cause is the agent or runner: confirm the
+   run config shows the known-good version, run one live Test Agent chat, check the Lookup tool's
+   test URL, and stop there.
 5. If it passes, create the other nine folders and import each CSV into its own folder.
 6. Add the gate tests above to the quality gate and run.
