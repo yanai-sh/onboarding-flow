@@ -16,59 +16,40 @@ are marked done only after a human confirms them in Insait.
 Insait allows only **one** Vehicle → Customer connector. Confirmed and unverified completion must
 share that single LLM exit; do not add a second edge to Customer.
 
-As of the last full export review, that exit (`Vehicle Confirmed`, `edge-1790111560877`) only
-fires on a matching verified vehicle. The Vehicle prompt already offers unverified continuation
-after eligible failures, but the exit condition ignores that path, so applicants can get stuck.
-Phases A–C below are paste-ready for a human builder. Do not check them off until the change is
-applied and smoke-tested in Insait.
+**Live version: V10** (V6, the language update, restored and republished on Sep 28 after a
+combined edit broke the flow). The Sep 28 export of V10 passes validation, every exit prompt is
+under Insait's 1000-character limit, and a live chat completed the Mandatory path end to end:
+plate lookup, vehicle confirmation, contacts, summary, and closing. Apply any further change
+**one at a time**, publishing and running a live chat (`Mandatory` → `12345678` → `y`) after
+each, so a regression points to a single change.
 
-**Known-good baseline: V6** (language update). On Sep 28 a combined edit broke the flow (first
-an exit prompt over the 1000-character limit, then a hang on the first save-and-transition turn),
-and the live agent was rolled back to V6. A live chat on V6 then completed the Mandatory path end
-to end: plate lookup, vehicle confirmation, contacts, summary, and closing. Apply the changes
-below **one at a time** on top of V6, publishing and running a live chat (`Mandatory` →
-`12345678` → `y`) after each, so a regression points to a single change.
+### A. Single Vehicle → Customer exit covers both paths (Critical) — applied in V10
 
-### A. Broaden the single Vehicle → Customer exit (Critical) — pending human apply
-
-On the **Vehicle** conversation node (`conversation-node`):
-
-1. Keep the existing LLM exit to **Customer** (`node-1790108830528`). Rename it to
-   **Vehicle Complete** if the UI allows (optional).
-2. Replace its condition prompt with the text below (620 characters; Insait rejects exit prompts
-   over 1000 characters, and an over-long prompt makes the whole flow fail validation):
+The V10 export shows **Vehicle Confirmed** (`edge-1790111560877`) already handles verified
+confirmation and explicit unverified continuation in one condition (418 characters):
 
 ```text
-Fire in either case; say nothing.
+Fire only when:
+1. lookup_success is true, vehicle_plate equals license_plate, and the applicant explicitly confirms the displayed vehicle; or
+2. An eligible lookup failure occurred and the applicant explicitly accepted unverified continuation.
 
-A. Verified: lookup_success is true, vehicle_plate equals license_plate, all four vehicle fields are non-empty, and the applicant confirms the shown vehicle.
-
-B. Unverified: no verified match for the current plate, the previous assistant message offered to continue without verification after an eligible failure (second not-found, or second technical failure after an accepted retry), and the applicant explicitly accepts.
-
-Never fire after only one failure, for an invalid plate, a rejected vehicle, a side question, a repeated plate, or an unverified request that was never offered.
+Do not fire when the applicant rejects the vehicle, provides or requests a different plate, accepts a retry, asks a side question, or has not answered the pending question.
 ```
 
-3. Replace the exit `context_message` with:
-
-```text
-Vehicle step done for {{license_plate}}. Verified only if lookup_success is true and vehicle_plate equals license_plate; otherwise unverified. Next: full_name, phone, email — skip any already saved. Do not present registry details as confirmed unless verified.
-```
-
-4. Keep the Vehicle prompt failure rules unchanged (they still offer unverified only after eligible
-   second failures). Do not add another Vehicle → Customer edge.
-5. Publish the flow.
+Its context message tells Customer whether the vehicle is verified. Keep this text; do not add a
+second edge, and keep any edit under 1000 characters (a longer prompt fails validation and
+blocks the whole flow).
 
 Smoke (Test Agent + debug), after warming
 `curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`:
 
-- [ ] Happy path still works: `Mandatory` → `12345678` → `yes` → Customer.
-- [ ] `Mandatory` → `00000000` → not found → second completed not-found → accept continue
+- [x] Happy path: `Mandatory` → `12345678` → `y` → contacts → summary → closing (live chat on
+  Sep 28, human confirmed).
+- [ ] `Mandatory` → `00000000` → not found → `11111111` → not found → accept continue
   unverified → contact → Summary shows vehicle not yet verified.
 - [ ] After only one not-found, accepting continue must remain in Vehicle.
 - [ ] Technical path (optional): two completed Lookup failures with an accepted retry between
   them, then accept unverified.
-
-- [ ] **A applied and smoke-tested in Insait** (human confirmed)
 
 ### B. Customer prompt and tool schema (Low–Medium) — pending human apply
 
@@ -127,7 +108,7 @@ Once full_name, phone, and email are valid, say nothing; the flow proceeds autom
 ```
 
 **Encore AI Tools schema — deferred.** The schema lists `required: ["query"]` without a `query`
-property, which is untidy but works on V6: the Lookup node calls the tool with empty parameters
+property, which is untidy but works on V10: the Lookup node calls the tool with empty parameters
 and fills the body from `{{license_plate}}`. Changing `required` risks breaking that call, so
 leave the schema as is.
 
