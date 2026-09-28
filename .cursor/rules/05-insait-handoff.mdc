@@ -1,8 +1,6 @@
 ---
 description: Manual Insait Conversation Flow handoff; do not automate the platform UI.
 globs:
-  - ARCHITECTURE.md
-  - CONTEXT.md
   - README.md
   - docs/**/*.md
   - infra/README.md
@@ -19,14 +17,14 @@ Never imply that repo code or scripts automated the Insait UI.
 
 - Flow shape, node types, and test record: `docs/insait-flow.md` (≤7 nodes
   including End, dedicated API node, no Collect Node).
-- Submission placeholders (workspace, agent, flow link, video): `README.md`.
+- Submission placeholders (workspace, agent, flow link, video): `docs/submission.md`.
 - Deploy URL for Insait: Cloud Run via `infra/README.md` after Terraform apply.
 - OpenAPI for integration: `/schema/openapi.json` (Swagger at `/schema/swagger`).
 
 ## Client contract reminders
 
 - Happy path and upstream faults: HTTP **200** + `success` / `error_code`.
-- Bad plates: HTTP **200** `INVALID_REQUEST` (ADR 0003); only malformed bodies
+- Bad plates: HTTP **200** `INVALID_REQUEST`; only malformed bodies
   are a framework 400, which the API node's error port covers.
 - Error codes for routing: `INVALID_REQUEST`, `VEHICLE_NOT_FOUND`,
   `UPSTREAM_TIMEOUT`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_INVALID_RESPONSE`.

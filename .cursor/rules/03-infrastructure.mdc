@@ -15,7 +15,7 @@ globs:
 - BuildKit only: `# syntax=docker/dockerfile:1`, cache/bind mounts, `docker buildx`.
   Legacy `docker build` and bare `gcloud builds submit --tag` fail this Dockerfile.
 - Multi-stage: `uv` locked sync in builder; `python:3.14-slim` + `appuser` runtime.
-- Granian settings are `GRANIAN_*` **image ENV**, not `CMD` flags (ADR 0002).
+- Granian settings are `GRANIAN_*` **image ENV**, not `CMD` flags.
   Image facts: `asgi`, `0.0.0.0`, one worker, no WS, no access log, 8s kill timeout.
   Shell resolves only `$PORT` → Granian; `exec granian` keeps PID 1 for SIGTERM.
 - Prefer Cloud Build (`cloudbuild.yaml`, amd64) from aarch64 WSL; local push needs

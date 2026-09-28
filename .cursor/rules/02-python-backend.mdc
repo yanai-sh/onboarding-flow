@@ -7,7 +7,7 @@ globs: "**/*.py"
 ## Stack (locked)
 
 - Python 3.14 · Litestar controllers · Pydantic v2 · `pydantic-settings`
-- Outbound: process-scoped `httpx.AsyncClient` in lifespan (ADR 0002)
+- Outbound: process-scoped `httpx.AsyncClient` in lifespan
 - Serve: Granian ASGI via `GRANIAN_*` image env — interface `asgi`, not `asginl`
 - Logs: stdlib JSON via `onboarding_flow.observability`; `extra=` fields only
 - Absolute imports only (`ban-relative-imports`)
@@ -18,7 +18,7 @@ globs: "**/*.py"
   (or `httpx.MockTransport`) — never hit the real Encore URL in unit tests.
 - `VehicleRequest` checks structure only; the handler applies
   `normalize_license_plate`, and a rule failure is an envelope outcome, not a
-  4xx (ADR 0003). The same plate rule validates upstream success payloads.
+  4xx. The same plate rule validates upstream success payloads.
 - Envelope: flat `VehicleInfoResponse`; `vehicle.py` maps `UpstreamOutcome` and
   owns the speakable `MESSAGES`. Do not mint `trace_id` in handlers — read
   `request.state.trace_id`.
@@ -27,7 +27,7 @@ globs: "**/*.py"
 ## Observability and PII
 
 - `TraceMiddleware` accepts or replaces `X-Trace-ID`; ContextVar → every record.
-- Five events only (see `ARCHITECTURE.md`). Never log raw plates, bodies, or
+- Five events only (see `docs/architecture.md`). Never log raw plates, bodies, or
   PII; use `plate_mask`. Exception messages state the rule, never the value
   (`msg = "..."; raise X(msg)`); ruff `EM`/`TRY`/`G` enforce the shape, the
   500-path test enforces the content.

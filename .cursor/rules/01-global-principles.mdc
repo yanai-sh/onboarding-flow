@@ -8,8 +8,8 @@ alwaysApply: true
 
 Part A (proxy + packaging + Cloud Run deploy) is **complete**. Prefer protecting
 the shipped contract over new features. Remaining assignment work is the manual
-Insait flow (`docs/insait-flow.md`). Read `CONTEXT.md` and `ARCHITECTURE.md`
-before changing behavior; ADRs under `docs/adr/` win on disputed contracts.
+Insait flow (`docs/insait-flow.md`). Read `docs/architecture.md` before changing
+behavior; it is the source of truth for the shipped contract.
 
 Out of scope (do not add): retries, caching, auth, persistence, pricing, OTEL,
 semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
@@ -17,7 +17,7 @@ semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
 ## Lean proxy
 
 - Minimal dependencies; one HTTP stack (`httpx`), one logging pipeline (stdlib).
-- Comments explain *why*; architecture lives in `ARCHITECTURE.md`.
+- Comments explain *why*; architecture lives in `docs/architecture.md`.
 - Composition wires deps in the lifespan; handlers do not construct clients.
 
 ## Resilience at the boundary
@@ -26,5 +26,5 @@ semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
   (`success` / `error_code`). Never unmapped 5xx from expected upstream faults.
 - A plate that breaks the 7–8 digit rule (or that upstream rejects) → HTTP 200
   `INVALID_REQUEST`; only structural faults (malformed JSON, missing field,
-  wrong type) → framework **400** (ADR 0003). Changing that split needs an ADR.
+  wrong type) → framework **400**. Update `docs/architecture.md` with any change.
 - No automatic retries; keep the user-facing path bounded.
