@@ -28,7 +28,7 @@ live proxy if the importer does not accept null.
 | File | Contents |
 |---|---|
 | `new-strict-replays.*.csv` | The six new tests (VEHICLE-05/06/07, SECURITY-01, CORRECTION-07/08) |
-| `new-<folder>.*.csv` | Same six, split by destination folder |
+| `new-07-unverified-security-backtrack.*.csv` | Same six, all in folder `07-unverified-security-backtrack` |
 | `existing-strict-replays.*.csv` | The current 27 stricts (re-export / backup) |
 | `all-strict-replays.*.csv` | Existing 27 + six new |
 
