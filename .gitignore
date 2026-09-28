@@ -31,7 +31,6 @@ infra/terraform/*.tfvars
 # Local workspace
 .cursor/*
 !.cursor/rules/
-!.cursor/environment.json
 .scratch/
 
 # Third-party agent skills: installed locally, not vendored
