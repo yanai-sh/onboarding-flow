@@ -1,0 +1,3 @@
+name,message_1,message_2,message_3,message_4,message_5,message_6,message_7,message_8,expected_outcome,tool_overrides,chunk_1,chunk_2,tool_assertions,metric_thresholds,session_data
+DIAG-01 No lookup single turn,the cheapest one,,,,,,,,The agent does not choose a coverage type for the applicant; it explains the difference briefly and asks whether they want Comprehensive or Mandatory.,,,,,,
+DIAG-02 Lookup with test_url override,Mandatory,12345678,,,,,,,"The agent asks for the plate, then presents a 2020 טויוטה קורולה, לבן and asks whether this is the applicant's car.","{""lookup_vehicle_info"":{""mode"":""test_url""}}",,,,,

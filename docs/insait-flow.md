@@ -1,12 +1,132 @@
-# Insait flow: design and test record
+# Insait flow: design and test suite
 
 The Conversation Flow Agent is built by hand in the Insait platform UI. Nothing in this
-repository creates, deploys, or tests it. This document is the design to build from and the test
-record to complete in the Test Agent debug view (⋮ → Show debug info). The workspace, agent,
-flow link, and video go in the [README](../README.md#submission).
+repository creates, deploys, or tests it. This document is the design to build from, the test
+suite to run in Insait Testing, and the manual checks for the Test Agent debug view. The
+workspace, agent, flow link, and video go in the [README](../README.md#submission).
 
 There is no public Insait builder documentation, so node semantics come from the assignment.
 Items marked **[verify in UI]** are assumptions about platform features, each with a fallback.
+
+Live agent id: `d2c2df93-e514-4b99-a962-243752105fa0` (Encore AI Insurance). Platform actions below
+are marked done only after a human confirms them in Insait.
+
+## Live gap and HITL apply checklist
+
+Insait allows only **one** Vehicle → Customer connector. Confirmed and unverified completion must
+share that single LLM exit; do not add a second edge to Customer.
+
+**Live version: V10** (V6, the language update, restored and republished on Sep 28 after a
+combined edit broke the flow). The Sep 28 export of V10 passes validation, every exit prompt is
+under Insait's 1000-character limit, and a live chat completed the Mandatory path end to end:
+plate lookup, vehicle confirmation, contacts, summary, and closing. Apply any further change
+**one at a time**, publishing and running a live chat (`Mandatory` → `12345678` → `y`) after
+each, so a regression points to a single change.
+
+### A. Single Vehicle → Customer exit covers both paths (Critical) — applied in V10
+
+The V10 export shows **Vehicle Confirmed** (`edge-1790111560877`) already handles verified
+confirmation and explicit unverified continuation in one condition (418 characters):
+
+```text
+Fire only when:
+1. lookup_success is true, vehicle_plate equals license_plate, and the applicant explicitly confirms the displayed vehicle; or
+2. An eligible lookup failure occurred and the applicant explicitly accepted unverified continuation.
+
+Do not fire when the applicant rejects the vehicle, provides or requests a different plate, accepts a retry, asks a side question, or has not answered the pending question.
+```
+
+Its context message tells Customer whether the vehicle is verified. Keep this text; do not add a
+second edge, and keep any edit under 1000 characters (a longer prompt fails validation and
+blocks the whole flow).
+
+Smoke (Test Agent + debug), after warming
+`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`:
+
+- [x] Happy path: `Mandatory` → `12345678` → `y` → contacts → summary → closing (live chat on
+  Sep 28, human confirmed).
+- [ ] `Mandatory` → `00000000` → not found → `11111111` → not found → accept continue
+  unverified → contact → Summary shows vehicle not yet verified.
+- [ ] After only one not-found, accepting continue must remain in Vehicle.
+- [ ] Technical path (optional): two completed Lookup failures with an accepted retry between
+  them, then accept unverified.
+
+### B. Customer prompt and tool schema (Low–Medium) — pending human apply
+
+**Customer node prompt:** remove the conflicting language-gate line
+`Do not acknowledge vehicle confirmation; immediately ask only for the next missing contact field.`
+Keep the first-entry rule that briefly acknowledges confirmed vs unverified, then asks one missing
+field. Paste-ready Customer prompt:
+
+```text
+Language gate — apply before every other instruction:
+conversation_language="{{conversation_language}}"
+
+- If conversation_language is "he", output Hebrew only.
+- If conversation_language is "en" or empty, output English only.
+- Numeric input, email, canonical values, and node transitions never change the language.
+
+Current State:
+license_plate="{{license_plate}}"
+lookup_success="{{lookup_success}}"
+vehicle_plate="{{vehicle_plate}}"
+full_name="{{full_name}}"
+phone="{{phone}}"
+email="{{email}}"
+
+Collect full_name, phone, and email.
+
+Accept valid fields in any order and accept several fields in one message. Save each valid field independently and skip fields already saved.
+
+On the first request in this node:
+- If lookup_success is true and vehicle_plate equals license_plate, briefly say the vehicle was confirmed.
+- Otherwise, briefly say that a licensed agent will verify the vehicle later.
+
+Then ask for exactly one missing field at a time:
+
+When full_name is missing:
+- he: מה שמך המלא?
+- en: What is your full name?
+
+When phone is missing:
+- he: מהו מספר הטלפון הנייד הישראלי שבו נשתמש?
+- en: What Israeli mobile number should we use?
+
+When email is missing:
+- he: מהי כתובת האימייל שבה נשתמש?
+- en: What email address should we use?
+
+Apply the global validation and normalization rules.
+
+If a value is invalid, explain the expected form briefly and re-ask only that field.
+
+If the applicant provides several fields and one is invalid, save the valid fields and ask only for the invalid or missing field.
+
+If the applicant explicitly wants to change the plate or vehicle, do not overwrite license_plate. Say nothing and take the plate-change exit.
+
+Once full_name, phone, and email are valid, say nothing; the flow proceeds automatically.
+```
+
+**Encore AI Tools schema — deferred.** The schema lists `required: ["query"]` without a `query`
+property, which is untidy but works on V10: the Lookup node calls the tool with empty parameters
+and fills the body from `{{license_plate}}`. Changing `required` risks breaking that call, so
+leave the schema as is.
+
+**Lookup wait feedback [verify in UI]:** if the builder exposes acknowledgements for the Lookup
+API node, enable a short wait message. Skip if the control is unclear.
+
+- [ ] **B applied in Insait** (human confirmed)
+
+### C. Test suite and quality gate (High) — pending human apply
+
+After A and B, replace every existing test with the [test suite](#test-suite): delete all tests
+and folders, import and run `01-smoke` first, then import each per-folder CSV from
+[`insait-tests/`](insait-tests/). The rollout steps are in
+[`insait-tests/README.md`](insait-tests/README.md).
+
+- [ ] **C: `01-smoke` imported and passing** (human confirmed)
+- [ ] **C: suite imported and run; 10 gate tests in the quality gate** (human confirmed; gate
+  result: `________`)
 
 ## Graph
 
@@ -16,10 +136,9 @@ deterministic expression edge; **L** marks an LLM-evaluated exit.
 ```mermaid
 flowchart TD
   O["Opening<br/>conversation"] -->|"D: insurance_type set"| V["Vehicle<br/>conversation"]
-  V -->|"L: plate to look up + D: plate valid"| L["Lookup<br/>API: POST /vehicle-info"]
+  V -->|"L: plate to look up"| L["Lookup<br/>API: POST /vehicle-info"]
   L -->|"D: success / error_code / error port"| V
-  V -->|"L: vehicle confirmed + D: lookup matches plate"| C["Customer<br/>conversation"]
-  V -->|"L: continue unverified + D: no valid lookup"| C
+  V -->|"L: vehicle complete confirmed or unverified"| C["Customer<br/>conversation"]
   C -->|"D: contact valid and Comprehensive"| K["Coverage<br/>conversation"]
   C -->|"D: contact valid and Mandatory"| S["Summary<br/>conversation"]
   K -->|"L: selection final / D: Mandatory"| S
@@ -33,7 +152,7 @@ flowchart TD
 | Node | Type | Why this type | Saves | Exits |
 |---|---|---|---|---|
 | Opening | Conversation | A natural welcome that accepts answers out of order; the choice drives a business branch, so the exit is an expression. | `insurance_type`; any other valid field volunteered | D: `insurance_type` is `Comprehensive` or `Mandatory` → Vehicle |
-| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Only the call itself is strict. | `license_plate` | L "plate to look up" + D `license_plate` matches `^\d{7,8}$` → Lookup. L "confirmed the shown vehicle" + D `lookup_success == true AND vehicle_plate == license_plate` → Customer. L "chose to continue unverified" + D `lookup_success != true OR vehicle_plate != license_plate` → Customer |
+| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Only the call itself is strict. | `license_plate` | L "plate to look up" → Lookup. One L exit "vehicle complete" → Customer: either confirmed matching lookup, or explicit accept of offered unverified continuation after an eligible second failure. Insait allows only one Vehicle → Customer connector, so both paths share that exit condition. |
 | Lookup | API | The call must run on the validated plate and route the same way every time. Response mapping copies the Hebrew values without LLM transcription, and the branch shows in debug. | `lookup_*`, `vehicle_*` by response mapping | D: every outcome → Vehicle, which words its reply from `lookup_error_code` |
 | Customer | Conversation | Three validated fields in any order, skipping those already saved. The assignment rules out the Collect Node. | `full_name`, `phone`, `email` | D: `full_name` set, `phone` matches `^05\d{8}$`, `email` matches the email rule, and `Comprehensive` → Coverage; the same with `Mandatory` → Summary. L: change plate → Vehicle |
 | Coverage | Conversation | A multi-select in natural language. Only Comprehensive reaches it: Mandatory covers bodily injury only, so property add-ons do not apply. | `coverage_options` | L "selection is final, including none" → Summary. D: `insurance_type == Mandatory` → Summary. L: change plate → Vehicle |
@@ -42,10 +161,10 @@ flowchart TD
 
 If a conversation node can end the chat, End can be dropped (six nodes).
 
-The Vehicle exits combine an LLM condition with an expression guard on one edge [verify in UI].
-If an edge must be one or the other, use L-only exits with the guard written into the condition
-text; the proxy's `INVALID_REQUEST` backstops the plate, and the Vehicle prompt offers
-confirmation only after a successful lookup of the current plate.
+Insait allows only one Vehicle → Customer connector, so confirmed and unverified completion share
+a single L exit whose condition text encodes both paths. The proxy's `INVALID_REQUEST` backstops
+the plate. The Vehicle prompt offers confirmation only after a successful lookup of the current
+plate, and offers unverified continuation only after an eligible second failure.
 
 The lookup is its own API node rather than a tool inside Vehicle. As a tool, the LLM would decide
 when, or whether, to call it, and could skip the call, repeat it, or invent vehicle details. As
@@ -142,34 +261,69 @@ its node.
 - **"Skip to the summary":** every forward edge requires validated saved values, and Summary
   requires an explicit confirmation, so the prompt cannot shortcut the steps.
 
-## Test record
+## Test suite
 
-Warm the service first (`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`). Use a
-fresh Test Agent session per run with the debug view open.
+Thirty Strict Replay tests in ten dedicated folders, in flow order, one CSV per folder under
+[`insait-tests/`](insait-tests/). **G** marks the ten quality-gate tests. All
+run with evaluation model `gpt-5.6-luna` at temperature 0, no simulation model, and no tool
+overrides, so Lookup calls the live proxy: `12345678` is found (2020 טויוטה קורולה, לבן);
+`00000000` and `11111111` are not found. Each test stops at the state it asserts, and every
+expected outcome also forbids error codes, HTTP statuses, "API", tool names, prices, and
+policy-issued claims.
 
-- [ ] **Happy Comprehensive:** "Comprehensive", "12345678", "yes", "Dana Levi", "0501234567",
-  "dana@example.com", "windshield and replacement car", "confirm". Path O → V → L → V → C → K →
-  S → E; `vehicle_manufacturer` = טויוטה, `coverage_options` = `[windshield, replacement_vehicle]`.
-- [ ] **Happy Mandatory:** the same with "Mandatory"; `insurance_type == Mandatory` skips Coverage.
-- [ ] **Not found, then recover:** "00000000", then "12345678". The first lookup shows
-  `VEHICLE_NOT_FOUND` and no vehicle; the second succeeds.
-- [ ] **Invalid and dashed plates:** "ABC12" and "123" are re-asked with no Lookup in debug;
-  "12-345-678" is saved as `12345678` and looked up.
-- [ ] **Error port:** in a copy of the agent, point the node at `/nope` on the service (HTTP
-  404). One retry is offered, then the unverified exit opens; Summary shows "not yet verified".
+| Id | Folder | Asserted behavior | Gate |
+|---|---|---|---|
+| SMK-01 | `01-smoke` | Mandatory end to end: verified vehicle, contacts, add-ons not applicable, closing | G |
+| SMK-02 | `01-smoke` | Comprehensive end to end with windshield and replacement vehicle | G |
+| OPN-01 | `02-opening` | Ambiguous coverage is explained and asked again, never inferred | |
+| OPN-02 | `02-opening` | A misspelled coverage type is saved as canonical Mandatory | |
+| OPN-03 | `02-opening` | Everything volunteered in the first message is kept; only the vehicle is confirmed | G |
+| VEH-01 | `03-vehicle` | Invalid plates are re-asked and never looked up | G |
+| VEH-02 | `03-vehicle` | "Not my car" asks for another plate | |
+| REC-01 | `04-lookup-recovery` | One not-found does not unlock unverified continuation | G |
+| REC-02 | `04-lookup-recovery` | Two not-founds unlock unverified; Summary shows the vehicle as not yet verified | G |
+| REC-03 | `04-lookup-recovery` | A found plate after a not-found recovers the verified path | |
+| CON-01 | `05-contact` | One contact field at a time, no re-asks | |
+| CON-02 | `05-contact` | Space-separated contacts in one message are all extracted | |
+| CON-03 | `05-contact` | An invalid phone is refused; +972 is normalized to 05 | |
+| CON-04 | `05-contact` | An email domain typo is asked about, not silently saved | |
+| CON-05 | `05-contact` | Valid contacts are not security-blocked (regression for `5209f1f2`) | G |
+| COV-01 | `06-coverage` | "None" finalizes add-ons without another turn | |
+| SUM-01 | `07-summary` | "Thanks" and a bare "no" do not close | G |
+| SUM-02 | `07-summary` | A side question is answered, then "correct" confirms | |
+| COR-01 | `08-corrections` | Name, phone, and email corrected at Summary, each followed by a full summary | |
+| COR-02 | `08-corrections` | Mandatory to Comprehensive at Summary routes through add-ons | |
+| COR-03 | `08-corrections` | "None" replaces a prior add-on selection | |
+| COR-04 | `08-corrections` | A plate change at Summary never presents the old vehicle | G |
+| COR-05 | `08-corrections` | A plate change during contact collection returns to the plate step | |
+| COR-06 | `08-corrections` | A plate change at the add-on step returns to the plate step | |
+| COR-07 | `08-corrections` | A phone correction at the add-on step is saved in place | |
+| LNG-01 | `09-language` | Hebrew end to end, including a Hebrew closing | G |
+| LNG-02 | `09-language` | A mid-conversation switch to Hebrew persists through numeric input | |
+| GRD-01 | `10-guardrails` | "Skip to the summary" and a price question keep the plate pending | |
+| GRD-02 | `10-guardrails` | Applicant-supplied vehicle details never replace the registry result | |
+| GRD-03 | `10-guardrails` | Instructions are not revealed; the agent says it is an AI | |
+
+- [ ] **Suite run on the published version** (human confirmed; pass count: `____ / 30`)
+
+### Manual checks
+
+The live proxy cannot force a technical failure, so these run by hand in the Test Agent debug
+view (⋮ → Show debug info). Warm the service first
+(`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`) and use a fresh session per run.
+
+- [ ] **Error port:** in a copy of the agent, point the Lookup node at `/nope` on the service
+  (HTTP 404). One retry is offered; after the accepted retry fails too, unverified continuation
+  is offered, and Summary shows the vehicle as not yet verified.
 - [ ] **Registry down (optional):** deploy a temporary revision by adding
   `-var upstream_url=https://upstream.invalid/vehicle-info` (or `-var
   upstream_timeout_seconds=0.001`) to the usual `terraform apply -var image_tag=…`, then
-  re-apply without it. Lookup returns HTTP 200
-  `UPSTREAM_UNAVAILABLE` (or `UPSTREAM_TIMEOUT`) and follows the same retry-then-unverified path.
-- [ ] **Invalid phone and email:** "050-12" and "+1 555 1234" are refused; "+972 50 123 4567"
-  saves `0501234567`; "dana@" is refused before "dana@example.com" is saved.
-- [ ] **Correction in place:** in Coverage, "my phone is actually 052-7654321". Stays in
-  Coverage; `phone` = `0527654321`; no back-edge in debug.
-- [ ] **Plate correction at Summary:** "the plate is wrong, it's 1234567". Path S → V → L → V →
-  C → K → S; the old vehicle is not offered for confirmation.
-- [ ] **Late type switch:** at a Mandatory Summary, "make it comprehensive" → Coverage → Summary.
-- [ ] **Side question and "not my car":** "how much does it cost?" in Customer causes no node
-  change; "no, that's not my car" after a found lookup re-asks the plate.
-- [ ] **Hebrew:** the happy Comprehensive run in Hebrew ("מקיף", "12-345-678", …). Same saved
-  state, with `insurance_type` = `Comprehensive`; replies in Hebrew.
+  re-apply without it. Lookup returns HTTP 200 `UPSTREAM_UNAVAILABLE` (or `UPSTREAM_TIMEOUT`)
+  and follows the same retry-then-unverified path.
+- [ ] **Debug path check:** in one SMK-02 run, confirm the node path O → V → L → V → C → K → S →
+  E and the saved `coverage_options` = `[windshield, replacement_vehicle]`.
+
+### Deferred (not Part B take-home blockers)
+
+Domain allowlist, legal disclaimer, retention days, `mask_pii`, fail-open / output-security policy,
+and remapping lookup/vehicle variables away from `source=user` until a spoof reproduction exists.
