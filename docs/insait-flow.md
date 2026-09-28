@@ -137,11 +137,11 @@ API node, enable a short wait message. Skip if the control is unclear.
 ### C. Test suite and quality gate (High) — pending human apply
 
 After A and B, replace every existing test with the [test suite](#test-suite): delete all tests
-and folders, hand-create and run SMK-01 first, then import each per-folder CSV from
+and folders, import and run `01-smoke` first, then import each per-folder CSV from
 [`insait-tests/`](insait-tests/). The rollout steps are in
 [`insait-tests/README.md`](insait-tests/README.md).
 
-- [ ] **C: SMK-01 hand-created and passing** (human confirmed)
+- [ ] **C: `01-smoke` imported and passing** (human confirmed)
 - [ ] **C: suite imported and run; 10 gate tests in the quality gate** (human confirmed; gate
   result: `________`)
 

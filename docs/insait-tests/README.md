@@ -20,22 +20,30 @@ human uploads them in the Insait Testing UI.
 
 ## Columns
 
-Only fields present on every existing platform test: `name`, `expected_outcome`, and
-`flow_questions` (a JSON array of applicant turns). Folder, channel, evaluation model, and
-quality-gate membership are set in the UI, not in the file. Insait publishes no import template,
-so if its **Download template** header differs, map these three columns onto it.
+The header follows Insait's Strict Replay template exactly:
 
-Set on each folder or run: Strict Replay, chat, evaluation model `gpt-5.6-luna` at temperature 0,
-no simulation model, no tool overrides. Lookup calls the live proxy: `12345678` is found;
-`00000000` and `11111111` are not found.
+```text
+name,message_1,…,message_8,expected_outcome,tool_overrides,chunk_1,chunk_2,tool_assertions,metric_thresholds,session_data
+```
+
+Each row is one conversation: `name` is the flow name, and `message_1`…`message_8` are the
+applicant turns in order (empty cells are skipped). `tool_overrides`, `chunk_*`,
+`tool_assertions`, `metric_thresholds`, and `session_data` are left empty, so Lookup calls the
+live proxy: `12345678` is found; `00000000` and `11111111` are not found. The CSV has no folder
+column; the folder is whichever one you import into.
+
+In the import dialog: flow name column A (`name`), messages B–I (`message_1`…`message_8`),
+expected outcome column J (`expected_outcome`), and keep **Skip header row** on.
+
+Set on each folder or run: evaluation model `gpt-5.6-luna` at temperature 0 and no simulation
+model.
 
 ## Rollout
 
 1. Delete all existing tests and folders.
-2. Create folder `01-smoke` and hand-create `SMK-01 Mandatory end to end` as a Strict Replay
-   with the turns from `01-smoke.csv`. Run it.
-3. If the hand-made SMK-01 shows an execution error, the cause is the agent or runner, not the
-   CSV: publish the agent, run one live Test Agent chat, check the Lookup tool URL and the tool
-   schema's `required` field, and stop there.
-4. If it passes, create the remaining folders and import each CSV into its folder.
+2. Create folder `01-smoke`, import `01-smoke.csv` into it, and run it.
+3. If SMK-01 shows an execution error, the cause is the agent or runner: publish the agent, run
+   one live Test Agent chat, check the Lookup tool URL and the tool schema's `required` field,
+   and stop there.
+4. If it passes, create the other nine folders and import each CSV into its own folder.
 5. Add the gate tests above to the quality gate and run.
