@@ -45,3 +45,23 @@ live proxy if the importer does not accept null.
 
 Confirmed and unverified completion share **one** Vehicle → Customer exit. New
 VEHICLE expected outcomes refer to that shared exit, not a second edge.
+
+## If import/run shows "execution error"
+
+Likely causes from the first pack:
+
+1. `tool_overrides` had `"test_url": null` while `mode` was `test_url` — Lookup then has no URL.
+2. Column names did not match the Insait import template, so turns/overrides were empty or invalid.
+3. **VEHICLE-06** forces HTTP 500; some runners treat that as a harness execution error.
+
+Use these fixed files instead (also copied to `~/Downloads`):
+
+| File | Purpose |
+|---|---|
+| `new-strict-replays.minimal.csv` | Simplest: `Name`, `Folder`, `Expected Outcome`, newline-separated `Flow Questions`; **no** tool overrides |
+| `new-strict-replays.fixed.json.csv` | API-shaped fields with a **real** proxy `test_url` |
+| `new-strict-replays.fixed.wide.csv` | `Question 1`…`Question N`; no overrides |
+| `new-strict-replays.no-vehicl06.minimal.csv` | Same as minimal but skips VEHICLE-06 |
+
+Preferred retry order: import `new-strict-replays.minimal.csv` (or the no-VEHICLE-06 variant), map columns in the UI if prompted, then run. Set Lookup test URL in each test to the live proxy only if the importer does not inherit the tool default.
+
