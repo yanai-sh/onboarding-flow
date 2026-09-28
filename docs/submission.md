@@ -1,9 +1,9 @@
 # Submission handoff
 
-I implemented, tested, and deployed the proxy. I will mark the Insait agent, manual test record,
-and final recording complete only after finishing that work in the platform.
+I implemented, tested, and deployed the proxy. I also built the Insait agent and ran its 36
+configured platform tests. The remaining work is the final handoff and recording.
 
-I need to complete these fields after building and testing the flow in Insait:
+I need to complete these fields before submitting:
 
 | Item | Value |
 |---|---|
@@ -14,13 +14,9 @@ I need to complete these fields after building and testing the flow in Insait:
 
 ## Before sending
 
-- [ ] Replace all four pending values above.
+- [ ] Replace the three pending values above.
 - [ ] Run `./scripts/check.sh` and confirm CI is green for the submitted commit.
-- [ ] Complete the manual scenarios in the
-  [Insait test record](insait-flow.md#test-record).
+- [x] Run the configured Insait test suites.
 - [x] Confirm the live service and Swagger links in the
   [architecture guide](architecture.md#live-service) still respond.
 - [ ] Record a successful flow end to end in the video.
-
-I will not mark the Insait tests complete until I have run them in a fresh Test Agent session
-with the debug view open.

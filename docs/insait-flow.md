@@ -135,19 +135,15 @@ its node.
 
 ## Test record
 
-Set `CLOUD_RUN_URL` to the current URL in the
-[architecture guide](architecture.md#live-service), then warm the service with
-`curl -fsS "$CLOUD_RUN_URL/health"`. Use a fresh Test Agent session with debug view open.
+On 2026-09-28, all 36 configured tests across ten suites passed in Insait. They cover:
 
-- [x] **Happy paths:** complete Comprehensive and Mandatory runs. Comprehensive visits Coverage;
-  Mandatory skips it. Both end only after explicit confirmation.
-- [x] **Plate handling:** reject `ABC12`, normalize `12-345-678`, recover from not found with a
-  valid plate, and confirm that the vehicle fields came from the API response.
-- [ ] **Unavailable service:** point a copied API node at `/nope`. Offer one retry, then continue
-  unverified and show that status in Summary.
-- [x] **Validation and corrections:** reject invalid contact details, normalize an Israeli
-  phone number, correct a phone in Coverage, and send a changed plate back through Lookup.
-- [x] **Off-script behavior:** answer a pricing question without changing nodes, reject
-  "not my car", and route a late insurance-type change correctly.
-- [x] **Hebrew:** complete the Comprehensive run in Hebrew and confirm canonical saved values
-  with Hebrew replies.
+- Comprehensive and Mandatory happy paths;
+- plate validation, normalization, not found, rejection, and recovery;
+- bundled, invalid, and corrected contact details;
+- add-on selection and insurance-type changes;
+- summary confirmation, mid-flow corrections, and stale-vehicle protection;
+- Hebrew, language switching, side questions, prompt injection, and pricing guardrails.
+
+The platform's per-test status override did not replace the live successful lookup, so it was
+not a reliable technical-outage simulation. I reviewed the API-node error edge and retry prompts
+separately rather than claiming that those two generated tests exercised an outage.

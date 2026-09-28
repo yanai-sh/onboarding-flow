@@ -5,7 +5,7 @@
 This is my Encore AI Forward Deployed Engineer take-home:
 
 1. I built a stateless vehicle-lookup proxy and deployed it to Cloud Run.
-2. I designed an Insait Conversation Flow Agent that calls the proxy during onboarding.
+2. I built and tested an Insait Conversation Flow Agent that calls the proxy during onboarding.
 
 I built and tested the Insait flow manually in its platform UI; the repository contains its
 design and test record. I do not redistribute the assignment PDF here.

@@ -6,10 +6,10 @@ alwaysApply: true
 
 ## Phase and scope
 
-Part A (proxy + packaging + Cloud Run deploy) is **complete**. Prefer protecting
-the shipped contract over new features. Remaining assignment work is the manual
-Insait flow (`docs/insait-flow.md`). Read `docs/architecture.md` before changing
-behavior; it is the source of truth for the shipped contract.
+Part A (proxy + packaging + Cloud Run deploy) and the manual Insait flow are
+**complete**. Prefer protecting the shipped contract over new features. Remaining
+work is the submission handoff (`docs/submission.md`). Read
+`docs/architecture.md` before changing behavior; it is the source of truth.
 
 Out of scope (do not add): retries, caching, auth, persistence, pricing, OTEL,
 semantic PII firewalls, HTTP/3, structlog, niquests, Insait UI automation.
