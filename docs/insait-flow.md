@@ -28,23 +28,17 @@ On the **Vehicle** conversation node (`conversation-node`):
 
 1. Keep the existing LLM exit to **Customer** (`node-1790108830528`). Rename it to
    **Vehicle Complete** if the UI allows (optional).
-2. Replace its condition prompt with:
+2. Replace its condition prompt with the text below (620 characters; Insait rejects exit prompts
+   over 1000 characters, and an over-long prompt makes the whole flow fail validation):
 
 ```text
-Fire when exactly one of these two paths is true. Say nothing when firing.
+Fire in either case; say nothing.
 
-Path A — verified confirmation:
-- lookup_success is true
-- vehicle_plate equals license_plate
-- vehicle_year, vehicle_manufacturer, vehicle_model, and vehicle_color are non-empty
-- the applicant's latest message confirms the displayed vehicle
+A. Verified: lookup_success is true, vehicle_plate equals license_plate, all four vehicle fields are non-empty, and the applicant confirms the shown vehicle.
 
-Path B — explicit unverified continuation:
-- there is no verified match for the current plate (lookup_success is not true, or vehicle_plate does not equal license_plate, or required vehicle fields are empty)
-- the immediately preceding assistant message offered to continue without registry verification after an eligible failure (second completed VEHICLE_NOT_FOUND, or second completed technical failure after an accepted retry)
-- the applicant's latest message explicitly accepts that offer
+B. Unverified: no verified match for the current plate, the previous assistant message offered to continue without verification after an eligible failure (second not-found, or second technical failure after an accepted retry), and the applicant explicitly accepts.
 
-Do not fire for the first not-found or first technical failure, INVALID_REQUEST, invalid local input, rejection of a shown vehicle, side questions, mere repetition of the plate, or unverified continuation that was never offered.
+Never fire after only one failure, for an invalid plate, a rejected vehicle, a side question, a repeated plate, or an unverified request that was never offered.
 ```
 
 3. Replace the exit `context_message` with:
