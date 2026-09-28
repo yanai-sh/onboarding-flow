@@ -126,9 +126,10 @@ If the applicant explicitly wants to change the plate or vehicle, do not overwri
 Once full_name, phone, and email are valid, say nothing; the flow proceeds automatically.
 ```
 
-**Encore AI Tools** (`lookup_vehicle_info`): set `function_definition.parameters.required` to
-`["license_plate"]` (not `query`). Keep the `license_plate` property, body template
-`{"license_plate": "{{license_plate}}"}`, and response mappings unchanged.
+**Encore AI Tools schema — deferred.** The schema lists `required: ["query"]` without a `query`
+property, which is untidy but works on V6: the Lookup node calls the tool with empty parameters
+and fills the body from `{{license_plate}}`. Changing `required` risks breaking that call, so
+leave the schema as is.
 
 **Lookup wait feedback [verify in UI]:** if the builder exposes acknowledgements for the Lookup
 API node, enable a short wait message. Skip if the control is unclear.
