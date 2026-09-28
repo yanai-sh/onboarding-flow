@@ -13,49 +13,61 @@ are marked done only after a human confirms them in Insait.
 
 ## Live gap and HITL apply checklist
 
-As of the last full export review, the design includes Vehicle → Customer **Continue Unverified**,
-but the published graph only had **Vehicle Confirmed** as the forward exit from Vehicle. The
-Vehicle prompt already offers unverified continuation after eligible failures; without the exit,
-applicants can get stuck. Phases A–C below are paste-ready for a human builder. Do not check them
-off until the change is applied and smoke-tested in Insait.
+Insait allows only **one** Vehicle → Customer connector. Confirmed and unverified completion must
+share that single LLM exit; do not add a second edge to Customer.
 
-### A. Continue Unverified exit (Critical) — pending human apply
+As of the last full export review, that exit (`Vehicle Confirmed`, `edge-1790111560877`) only
+fires on a matching verified vehicle. The Vehicle prompt already offers unverified continuation
+after eligible failures, but the exit condition ignores that path, so applicants can get stuck.
+Phases A–C below are paste-ready for a human builder. Do not check them off until the change is
+applied and smoke-tested in Insait.
+
+### A. Broaden the single Vehicle → Customer exit (Critical) — pending human apply
 
 On the **Vehicle** conversation node (`conversation-node`):
 
-1. Add an LLM exit named **Continue Unverified** targeting **Customer** (`node-1790108830528`).
-2. Set priority immediately after **Vehicle Confirmed** so confirmation wins when both could match.
-3. Paste this condition prompt:
+1. Keep the existing LLM exit to **Customer** (`node-1790108830528`). Rename it to
+   **Vehicle Complete** if the UI allows (optional).
+2. Replace its condition prompt with:
 
 ```text
-Fire only when all of the following are true:
-1. There is no verified match for the current plate: lookup_success is not true, or vehicle_plate does not equal license_plate, or required vehicle fields are empty.
-2. The immediately preceding assistant message offered to continue without registry verification after an eligible failure (second completed VEHICLE_NOT_FOUND, or second completed technical failure after an accepted retry).
-3. The applicant's latest message explicitly accepts that offer.
+Fire when exactly one of these two paths is true. Say nothing when firing.
 
-Do not fire for the first not-found or first technical failure, INVALID_REQUEST, invalid local input, vehicle confirmation, side questions, or mere repetition of the plate.
-When firing, say nothing; Customer explains that an agent will verify the vehicle later.
+Path A — verified confirmation:
+- lookup_success is true
+- vehicle_plate equals license_plate
+- vehicle_year, vehicle_manufacturer, vehicle_model, and vehicle_color are non-empty
+- the applicant's latest message confirms the displayed vehicle
+
+Path B — explicit unverified continuation:
+- there is no verified match for the current plate (lookup_success is not true, or vehicle_plate does not equal license_plate, or required vehicle fields are empty)
+- the immediately preceding assistant message offered to continue without registry verification after an eligible failure (second completed VEHICLE_NOT_FOUND, or second completed technical failure after an accepted retry)
+- the applicant's latest message explicitly accepts that offer
+
+Do not fire for the first not-found or first technical failure, INVALID_REQUEST, invalid local input, rejection of a shown vehicle, side questions, mere repetition of the plate, or unverified continuation that was never offered.
 ```
 
-4. Optional exit `context_message`:
+3. Replace the exit `context_message` with:
 
 ```text
-Unverified continuation for {{license_plate}}. lookup_success is not a verified match. Next: full_name, phone, email — skip any already saved. Do not present vehicle registry details as confirmed.
+Vehicle step done for {{license_plate}}. Verified only if lookup_success is true and vehicle_plate equals license_plate; otherwise unverified. Next: full_name, phone, email — skip any already saved. Do not present registry details as confirmed unless verified.
 ```
 
-5. Keep the Vehicle prompt failure rules and the **Vehicle Confirmed** exit unchanged.
-6. Publish the flow.
+4. Keep the Vehicle prompt failure rules unchanged (they still offer unverified only after eligible
+   second failures). Do not add another Vehicle → Customer edge.
+5. Publish the flow.
 
 Smoke (Test Agent + debug), after warming
 `curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`:
 
+- [ ] Happy path still works: `Mandatory` → `12345678` → `yes` → Customer.
 - [ ] `Mandatory` → `00000000` → not found → second completed not-found → accept continue
   unverified → contact → Summary shows vehicle not yet verified.
 - [ ] After only one not-found, accepting continue must remain in Vehicle.
 - [ ] Technical path (optional): two completed Lookup failures with an accepted retry between
   them, then accept unverified.
 
-- [ ] **A applied and smoke-tested in Insait** (human confirmed; record exit id here: `________`)
+- [ ] **A applied and smoke-tested in Insait** (human confirmed)
 
 ### B. Customer prompt and tool schema (Low–Medium) — pending human apply
 
@@ -143,10 +155,9 @@ deterministic expression edge; **L** marks an LLM-evaluated exit.
 ```mermaid
 flowchart TD
   O["Opening<br/>conversation"] -->|"D: insurance_type set"| V["Vehicle<br/>conversation"]
-  V -->|"L: plate to look up + D: plate valid"| L["Lookup<br/>API: POST /vehicle-info"]
+  V -->|"L: plate to look up"| L["Lookup<br/>API: POST /vehicle-info"]
   L -->|"D: success / error_code / error port"| V
-  V -->|"L: vehicle confirmed + D: lookup matches plate"| C["Customer<br/>conversation"]
-  V -->|"L: continue unverified + D: no valid lookup"| C
+  V -->|"L: vehicle complete confirmed or unverified"| C["Customer<br/>conversation"]
   C -->|"D: contact valid and Comprehensive"| K["Coverage<br/>conversation"]
   C -->|"D: contact valid and Mandatory"| S["Summary<br/>conversation"]
   K -->|"L: selection final / D: Mandatory"| S
@@ -160,7 +171,7 @@ flowchart TD
 | Node | Type | Why this type | Saves | Exits |
 |---|---|---|---|---|
 | Opening | Conversation | A natural welcome that accepts answers out of order; the choice drives a business branch, so the exit is an expression. | `insurance_type`; any other valid field volunteered | D: `insurance_type` is `Comprehensive` or `Mandatory` → Vehicle |
-| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Only the call itself is strict. | `license_plate` | L "plate to look up" + D `license_plate` matches `^\d{7,8}$` → Lookup. L "confirmed the shown vehicle" + D `lookup_success == true AND vehicle_plate == license_plate` → Customer. L "chose to continue unverified" + D `lookup_success != true OR vehicle_plate != license_plate` → Customer |
+| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Only the call itself is strict. | `license_plate` | L "plate to look up" → Lookup. One L exit "vehicle complete" → Customer: either confirmed matching lookup, or explicit accept of offered unverified continuation after an eligible second failure. Insait allows only one Vehicle → Customer connector, so both paths share that exit condition. |
 | Lookup | API | The call must run on the validated plate and route the same way every time. Response mapping copies the Hebrew values without LLM transcription, and the branch shows in debug. | `lookup_*`, `vehicle_*` by response mapping | D: every outcome → Vehicle, which words its reply from `lookup_error_code` |
 | Customer | Conversation | Three validated fields in any order, skipping those already saved. The assignment rules out the Collect Node. | `full_name`, `phone`, `email` | D: `full_name` set, `phone` matches `^05\d{8}$`, `email` matches the email rule, and `Comprehensive` → Coverage; the same with `Mandatory` → Summary. L: change plate → Vehicle |
 | Coverage | Conversation | A multi-select in natural language. Only Comprehensive reaches it: Mandatory covers bodily injury only, so property add-ons do not apply. | `coverage_options` | L "selection is final, including none" → Summary. D: `insurance_type == Mandatory` → Summary. L: change plate → Vehicle |
@@ -169,10 +180,10 @@ flowchart TD
 
 If a conversation node can end the chat, End can be dropped (six nodes).
 
-The Vehicle exits combine an LLM condition with an expression guard on one edge [verify in UI].
-If an edge must be one or the other, use L-only exits with the guard written into the condition
-text; the proxy's `INVALID_REQUEST` backstops the plate, and the Vehicle prompt offers
-confirmation only after a successful lookup of the current plate.
+Insait allows only one Vehicle → Customer connector, so confirmed and unverified completion share
+a single L exit whose condition text encodes both paths. The proxy's `INVALID_REQUEST` backstops
+the plate. The Vehicle prompt offers confirmation only after a successful lookup of the current
+plate, and offers unverified continuation only after an eligible second failure.
 
 The lookup is its own API node rather than a tool inside Vehicle. As a tool, the LLM would decide
 when, or whether, to call it, and could skip the call, repeat it, or invent vehicle details. As
