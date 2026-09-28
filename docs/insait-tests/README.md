@@ -38,6 +38,14 @@ expected outcome column J (`expected_outcome`), and keep **Skip header row** on.
 Set on each folder or run: evaluation model `gpt-5.6-luna` at temperature 0 and no simulation
 model.
 
+## Expected run times
+
+Completed Sep 23 runs took 3–48 s per test (about 25 s for the Mandatory happy path), so a
+folder finishes in a few minutes. A run pins the agent version that was live when it started
+(shown as Agent version in the run config). If tests sit at Pending or Running for several
+minutes with no transcript, check that version first: runs started on a broken version stay
+stuck even after a rollback. Cancel them and start new runs.
+
 ## Rollout
 
 1. Delete all existing tests and folders.
