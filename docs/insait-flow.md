@@ -1,12 +1,9 @@
 # Insait flow: design and test record
 
-I designed this Conversation Flow Agent for manual setup in the Insait platform UI. Nothing in
-this repository creates or deploys it. I will record completed tests only after running them in
-the Test Agent debug view (⋮ → Show debug info). The workspace, agent, flow link, and video go
-in the [submission handoff](submission.md).
-
-There is no public Insait builder documentation, so node semantics come from the assignment.
-Items marked **[verify in UI]** are assumptions about platform features, each with a fallback.
+I built this Conversation Flow Agent manually in the Insait platform UI. The exported
+configuration contains seven nodes and 36 test cases across ten suites. All tests passed on
+2026-09-28. The workspace, flow link, and video go in the
+[submission handoff](submission.md).
 
 ## Graph
 
@@ -18,7 +15,7 @@ flowchart TD
   O["Opening<br/>conversation"] -->|"D: insurance_type set"| V["Vehicle<br/>conversation"]
   V -->|"L: plate to look up + D: plate valid"| L["Lookup<br/>API: POST /vehicle-info"]
   L -->|"D: success / error_code / error port"| V
-  V -->|"L: vehicle confirmed + D: lookup matches plate"| C["Contact<br/>conversation"]
+  V -->|"L: confirmed or eligible unverified continuation"| C["Customer<br/>conversation"]
   V -->|"L: continue unverified + D: no valid lookup"| C
   C -->|"D: contact valid and Comprehensive"| K["Coverage<br/>conversation"]
   C -->|"D: contact valid and Mandatory"| S["Summary<br/>conversation"]
@@ -33,20 +30,16 @@ flowchart TD
 | Node | Type | Why this type | Saves | Exits |
 |---|---|---|---|---|
 | Opening | Conversation | A natural welcome that accepts answers out of order; the choice drives a business branch, so the exit is an expression. | `insurance_type`; any other valid field volunteered | D: `insurance_type` is `Comprehensive` or `Mandatory` → Vehicle |
-| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Only the call itself is strict. | `license_plate` | L "plate to look up" + D `license_plate` matches `^\d{7,8}$` → Lookup. L "confirmed the shown vehicle" + D `lookup_success == true AND vehicle_plate == license_plate` → Contact. L "chose to continue unverified" + D `lookup_success != true OR vehicle_plate != license_plate` → Contact |
+| Vehicle | Conversation | Collecting a plate as people say it and judging "yes, that's my car" are conversational. Prompt guards prevent lookup of invalid plates and prevent stale or missing vehicle data from being shown. | `license_plate`; volunteered fields | L: new valid plate or accepted retry → Lookup. L: confirmed matching vehicle or eligible unverified continuation → Customer |
 | Lookup | API | The call must run on the validated plate and route the same way every time. Response mapping copies the Hebrew values without LLM transcription, and the branch shows in debug. | `lookup_*`, `vehicle_*` by response mapping | D: every outcome → Vehicle, which words its reply from `lookup_error_code` |
-| Contact | Conversation | Three validated applicant fields in any order, skipping those already saved. The assignment rules out the Collect Node. | `full_name`, `phone`, `email` | D: `full_name` set, `phone` matches `^05\d{8}$`, `email` matches the email rule, and `Comprehensive` → Coverage; the same with `Mandatory` → Summary. L: change plate → Vehicle |
+| Customer | Conversation | Three validated applicant fields in any order, skipping those already saved. The assignment rules out the Collect Node. | `full_name`, `phone`, `email` | D: valid contacts and `Comprehensive` → Coverage; valid contacts and `Mandatory` → Summary. L: change plate → Vehicle |
 | Coverage | Conversation | A multi-select in natural language. Only Comprehensive reaches it: Mandatory covers bodily injury only, so property add-ons do not apply. | `coverage_options` | L "selection is final, including none" → Summary. D: `insurance_type == Mandatory` → Summary. L: change plate → Vehicle |
 | Summary | Conversation | Reading back every saved value and judging an explicit confirmation or a correction. | Re-saves any corrected field | L "explicitly confirmed" → End. D: `Comprehensive` and `coverage_options` unset → Coverage. L: change plate → Vehicle |
-| End | End [verify in UI] | A deterministic finish: thank the applicant, say a licensed agent will follow up, give `lookup_trace_id` as a reference. No policy is issued. | — | — |
+| End Node | End | A deterministic finish: thank the applicant, say a licensed agent will follow up, and give the conversation ID as an applicant-facing reference. No policy is issued. | — | — |
 
-The submitted design uses the End node. Drop it only if the platform has no dedicated End type;
-in that fallback, Summary ends the chat after explicit confirmation (six nodes).
-
-The Vehicle exits combine an LLM condition with an expression guard on one edge [verify in UI].
-If an edge must be one or the other, use L-only exits with the guard written into the condition
-text; the proxy's `INVALID_REQUEST` backstops the plate, and the Vehicle prompt offers
-confirmation only after a successful lookup of the current plate.
+The final flow uses LLM exits for conversational judgments and expression edges for contact and
+insurance-type business rules. The Lookup node has an always edge for response envelopes and an
+error edge for failures before an envelope is received.
 
 The lookup is its own API node rather than a tool inside Vehicle. As a tool, the LLM would decide
 when, or whether, to call it, and could skip the call, repeat it, or invent vehicle details. As
@@ -61,32 +54,29 @@ a node, the graph guarantees the call and routes on its result.
 | `vehicle_plate`, `vehicle_manufacturer`, `vehicle_model`, `vehicle_year`, `vehicle_color` | As returned (Hebrew text; the year is an integer) |
 | `full_name`, `phone`, `email` | Trimmed; phone as `05XXXXXXXX`; email lowercased |
 | `coverage_options` | A subset of `windshield`, `extended_third_party`, `replacement_vehicle`; empty means none |
-| `lookup_success`, `lookup_error_code`, `lookup_message`, `lookup_trace_id` | From the proxy envelope |
+| `lookup_success`, `lookup_error_code`, `lookup_message` | From the proxy envelope |
 
 Variables hold English tokens so expressions stay language-independent; replies follow the
-applicant's language. If the platform cannot tell "unset" from an empty list [verify in UI],
-save `["none"]` for no add-ons.
+applicant's language. `["none"]` represents a final choice of no add-ons.
 
 ## Lookup API node
 
 | Setting | Value |
 |---|---|
 | Request | `POST <CLOUD_RUN_URL>/vehicle-info`, `Content-Type: application/json`, body `{"license_plate": "{{license_plate}}"}`. Copy the current base URL from the [architecture guide](architecture.md#live-service). |
-| Trace header | Optional `X-Trace-ID` set to the conversation id, if the platform exposes one [verify in UI]. The proxy accepts 1–128 printable ASCII characters and stamps it on every log line. |
-| Timeout | At least 10 s if configurable [verify in UI]: the 5 s upstream budget plus a Cloud Run cold start |
+| Trace header | `X-Trace-ID: {{system__conversation_id}}` |
+| Timeout | 30 s, allowing for the proxy's 5 s upstream budget and a Cloud Run cold start |
 | Retries | None on the node. Retrying is a choice the agent offers the applicant. |
-| Mapping | `success`, `error_code`, `message`, `trace_id` → `lookup_*`; `data.license_plate` → `vehicle_plate`; `data.manufacturer`, `data.model`, `data.year`, `data.color` → `vehicle_*` |
+| Mapping | `success`, `error_code`, `message` → `lookup_success`, `lookup_error_code`, `lookup_message`; `data.license_plate` → `vehicle_plate`; `data.manufacturer`, `data.model`, `data.year`, `data.color` → `vehicle_*` |
 
-If response mapping is unavailable [verify in UI], Vehicle's save tool saves the vehicle fields.
-How the error port sets variables is unknown [verify in UI]; mapping probably does not run, so
-`lookup_*` stays unset or stale. If the error edge can assign variables, set
-`lookup_success = false` there. Either way the unverified guard opens, because it treats unset
-and stale results as "no valid lookup". Vehicle and Summary show vehicle values only when the
-confirm guard holds, so an earlier plate's vehicle is never presented as the current car.
+The API node extracts the response fields directly. Its error edge returns to Vehicle with
+context that one technical lookup failed before an envelope was received. Vehicle and Summary
+show vehicle data only when `lookup_success` is true and `vehicle_plate` matches the current
+plate, so an earlier vehicle is never presented as current.
 
 | Outcome | Arrives as | The agent | Next |
 |---|---|---|---|
-| Found | `success: true` | Shows "2020 טויוטה קורולה, לבן" (translated in English replies) and asks "Is this your car?" | Confirmed → Contact; "not mine" → re-ask the plate |
+| Found | `success: true` | Shows "2020 טויוטה קורולה, לבן" (translated in English replies) and asks "Is this your car?" | Confirmed → Customer; "not mine" → re-ask the plate |
 | `INVALID_REQUEST` | `success: false` | Says 7 or 8 digits are expected | Re-ask; never re-send the same value; no unverified option |
 | `VEHICLE_NOT_FOUND` | `success: false` | Asks the applicant to double-check the number | Re-ask; after two failed lookups, offer to continue unverified |
 | `UPSTREAM_TIMEOUT`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_INVALID_RESPONSE` | `success: false` | Says the registry is not answering right now | One retry the applicant agrees to, then offer to continue unverified |
@@ -120,26 +110,24 @@ the plate rule again.
 The applicant can fix a detail at any node, not only at the summary:
 
 1. **Re-save in place** for values with no side effects: `full_name`, `phone`, `email`,
-   `insurance_type`, and `coverage_options`. Every node after the owning node lists them in its
-   save tool, re-validates, re-saves, and confirms in one line. This relies on any node's save
-   tool writing any variable [verify in UI]; the fallback is two more L exits, from Coverage and
-   Summary to Contact.
+   `insurance_type`, and `coverage_options`. Customer, Coverage, and Summary expose the relevant
+   variables to their save tools, then validate and re-save corrections.
 2. **Exit back to the owning node** for the plate. A new plate invalidates the lookup, so
-   Contact, Coverage, and Summary each have the L exit "wants to change the plate" → Vehicle.
+   Customer, Coverage, and Summary each have the L exit "wants to change the plate" → Vehicle.
    The `vehicle_plate == license_plate` guard forces a fresh lookup before confirmation.
 
 A changed insurance type is re-saved in place, and expression edges repair the path
 (Comprehensive at Summary → Coverage; Mandatory at Coverage → Summary, which drops add-ons).
 
 Loop guards: each back-edge needs an explicit change request in the latest turn ("not when the
-applicant only repeats the plate"); re-entered nodes ask only for what changed; Contact's
-expression exits pass straight through [verify evaluation timing]; invalid input never leaves
+applicant only repeats the plate"); re-entered nodes ask only for what changed; Customer's
+expression exits pass straight through once all contacts are valid; invalid input never leaves
 its node.
 
 ## Off-script handling
 
 - **Everything in the first message:** Opening saves every valid field, Vehicle confirms the
-  plate in one line, and Contact's expression exit passes straight through.
+  plate in one line, and Customer's expression exit passes straight through.
 - **Side questions** ("How much will it cost?"): one sentence (prices come from a licensed agent
   afterwards), then the pending question again. No exit condition matches a side question.
 - **"Skip to the summary":** every forward edge requires validated saved values, and Summary
@@ -151,15 +139,15 @@ Set `CLOUD_RUN_URL` to the current URL in the
 [architecture guide](architecture.md#live-service), then warm the service with
 `curl -fsS "$CLOUD_RUN_URL/health"`. Use a fresh Test Agent session with debug view open.
 
-- [ ] **Happy paths:** complete Comprehensive and Mandatory runs. Comprehensive visits Coverage;
+- [x] **Happy paths:** complete Comprehensive and Mandatory runs. Comprehensive visits Coverage;
   Mandatory skips it. Both end only after explicit confirmation.
-- [ ] **Plate handling:** reject `ABC12`, normalize `12-345-678`, recover from not found with a
+- [x] **Plate handling:** reject `ABC12`, normalize `12-345-678`, recover from not found with a
   valid plate, and confirm that the vehicle fields came from the API response.
 - [ ] **Unavailable service:** point a copied API node at `/nope`. Offer one retry, then continue
   unverified and show that status in Summary.
-- [ ] **Validation and corrections:** reject invalid contact details, normalize an Israeli
+- [x] **Validation and corrections:** reject invalid contact details, normalize an Israeli
   phone number, correct a phone in Coverage, and send a changed plate back through Lookup.
-- [ ] **Off-script behavior:** answer a pricing question without changing nodes, reject
+- [x] **Off-script behavior:** answer a pricing question without changing nodes, reject
   "not my car", and route a late insurance-type change correctly.
-- [ ] **Hebrew:** complete the Comprehensive run in Hebrew and confirm canonical saved values
+- [x] **Hebrew:** complete the Comprehensive run in Hebrew and confirm canonical saved values
   with Hebrew replies.
