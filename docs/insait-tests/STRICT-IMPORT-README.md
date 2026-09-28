@@ -35,3 +35,15 @@
 | `strict-07.with-tool-override.csv` | Same five + Lookup override with real proxy URL |
 
 VEHICLE-06 (forced HTTP 500) is omitted until the Strict path is green.
+
+## Model settings
+
+Use **gpt-5.6-luna** for evaluation (and for simulation if the run UI forces a simulation model).
+
+In the run configuration / folder settings:
+- Evaluation model: `gpt-5.6-luna`
+- Evaluation temperature: `0`
+- Simulation model: `gpt-5.6-luna` (only if you are on Simulate; prefer Strict with no simulator)
+
+CSV columns `evaluation_model` / `simulation_model` / `evaluation_temperature` are set to these values in `strict-07.pipe.csv`, `strict-07.minimal.csv`, and `strict-07.smoke-core-clone.csv`. If the importer ignores them, set the same values manually on the folder or run dialog.
+
