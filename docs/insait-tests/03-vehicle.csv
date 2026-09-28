@@ -1,0 +1,3 @@
+name,expected_outcome,flow_questions
+VEH-01 Invalid plates never looked up,"Each invalid plate is rejected and requested again. No vehicle and no contact request is shown; the conversation stays at the plate step. No reply exposes an error code, HTTP status, the word API, a tool name, a price, or a policy-issued claim.","[""Mandatory"", ""ABC12"", ""123"", ""123456789""]"
+VEH-02 Not my car asks for another plate,"After the found vehicle is shown, the rejection is not treated as confirmation. The agent asks for a different plate and does not ask for contact details. No reply exposes an error code, HTTP status, the word API, a tool name, a price, or a policy-issued claim.","[""Mandatory"", ""12345678"", ""no, that is not my car""]"

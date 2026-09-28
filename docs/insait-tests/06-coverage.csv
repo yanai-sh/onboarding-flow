@@ -1,0 +1,2 @@
+name,expected_outcome,flow_questions
+COV-01 None finalizes add-ons immediately,"Add-ons are offered once. None finalizes the selection without another add-on question, and the summary shows Comprehensive with add-ons none. No reply exposes an error code, HTTP status, the word API, a tool name, a price, or a policy-issued claim.","[""Comprehensive"", ""12345678"", ""yes"", ""Dana Levi, 050-123-4567, dana@example.com"", ""none""]"

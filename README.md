@@ -116,8 +116,8 @@ The flow has seven nodes: five conversation nodes with save tools, one API node 
 and an end node. Business branching uses expression edges, and conversational judgment uses
 LLM exits. The flow is configured by hand in the Insait UI; nothing in this repository creates
 or changes it. The design, validation rules, correction handling, and test suite are in
-[`docs/insait-flow.md`](docs/insait-flow.md); the importable 30-test Strict Replay suite is
-[`docs/insait-tests/suite.csv`](docs/insait-tests/suite.csv).
+[`docs/insait-flow.md`](docs/insait-flow.md); the importable 30-test Strict Replay suite is in
+[`docs/insait-tests/`](docs/insait-tests/), one CSV per test group.
 
 Human-in-the-middle apply steps for the live agent (broaden the single Vehicle → Customer exit
 for confirmed and unverified paths, Customer prompt fix, tool schema, and the test suite rollout)

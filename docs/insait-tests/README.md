@@ -1,40 +1,41 @@
 # Insait strict-replay suite
 
-[`suite.csv`](suite.csv) is the full test suite for the live Insait agent: 30 Strict Replay tests
-in 8 folders, 10 of them in the quality gate. The design and per-test intent are in
-[`../insait-flow.md`](../insait-flow.md#test-suite). Nothing in this repository imports it; a
-human uploads it in the Insait Testing UI.
+Thirty Strict Replay tests, one CSV per test group. Each file is imported into its own dedicated
+folder of the same name. The design and per-test intent are in
+[`../insait-flow.md`](../insait-flow.md#test-suite). Nothing in this repository imports them; a
+human uploads them in the Insait Testing UI.
 
-## Rules
-
-- **Strict Replay only.** Each row is a scripted conversation (`flow_questions`). Do not import
-  it as Simulate, and do not set a simulation model on the run.
-- **Evaluation model** `gpt-5.6-luna`, temperature 0.
-- **No tool overrides.** Lookup uses the agent tool's live URL. Fixtures: `12345678` is found
-  (2020 טויוטה קורולה, לבן); `00000000` and `11111111` are not found.
+| File / folder | Tests | Quality gate |
+|---|---|---|
+| `01-smoke` | SMK-01, SMK-02 | both |
+| `02-opening` | OPN-01 … OPN-03 | OPN-03 |
+| `03-vehicle` | VEH-01, VEH-02 | VEH-01 |
+| `04-lookup-recovery` | REC-01 … REC-03 | REC-01, REC-02 |
+| `05-contact` | CON-01 … CON-05 | CON-05 |
+| `06-coverage` | COV-01 | — |
+| `07-summary` | SUM-01, SUM-02 | SUM-01 |
+| `08-corrections` | COR-01 … COR-07 | COR-04 |
+| `09-language` | LNG-01, LNG-02 | LNG-01 |
+| `10-guardrails` | GRD-01 … GRD-03 | — |
 
 ## Columns
 
-| Column | Meaning |
-|---|---|
-| `name` | Stage id and asserted behavior, e.g. `REC-02 Two not-founds unlock unverified` |
-| `folder_name` | `01-smoke` … `08-guardrails`, in flow order |
-| `expected_outcome` | What the evaluator checks |
-| `flow_questions` | Applicant turns, separated by ` \| ` |
-| `channel` | `chat` |
-| `quality_gate_mode` | `included` for gate tests, otherwise `excluded` |
-| `evaluation_model`, `evaluation_temperature` | `gpt-5.6-luna`, `0` |
+Only fields present on every existing platform test: `name`, `expected_outcome`, and
+`flow_questions` (a JSON array of applicant turns). Folder, channel, evaluation model, and
+quality-gate membership are set in the UI, not in the file. Insait publishes no import template,
+so if its **Download template** header differs, map these three columns onto it.
 
-If the import dialog uses its own template, map these columns to it. If it wants one column per
-turn, split `flow_questions` on ` | `.
+Set on each folder or run: Strict Replay, chat, evaluation model `gpt-5.6-luna` at temperature 0,
+no simulation model, no tool overrides. Lookup calls the live proxy: `12345678` is found;
+`00000000` and `11111111` are not found.
 
 ## Rollout
 
-1. Delete all existing tests and folders in Insait.
+1. Delete all existing tests and folders.
 2. Create folder `01-smoke` and hand-create `SMK-01 Mandatory end to end` as a Strict Replay
-   (eval model `gpt-5.6-luna`, no simulation model). Run it.
-3. If SMK-01 shows an execution error, the problem is the agent or runner, not this file: publish
-   the agent, warm `https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`, check the Lookup
-   tool URL, and stop there.
-4. If SMK-01 passes, import `suite.csv` (skip the duplicate SMK-01 row or delete the hand-made one).
-5. Run the suite and confirm the 10 gate tests are included in the quality gate.
+   with the turns from `01-smoke.csv`. Run it.
+3. If the hand-made SMK-01 shows an execution error, the cause is the agent or runner, not the
+   CSV: publish the agent, run one live Test Agent chat, check the Lookup tool URL and the tool
+   schema's `required` field, and stop there.
+4. If it passes, create the remaining folders and import each CSV into its folder.
+5. Add the gate tests above to the quality gate and run.

@@ -137,8 +137,8 @@ API node, enable a short wait message. Skip if the control is unclear.
 ### C. Test suite and quality gate (High) — pending human apply
 
 After A and B, replace every existing test with the [test suite](#test-suite): delete all tests
-and folders, hand-create and run SMK-01 first, then import
-[`insait-tests/suite.csv`](insait-tests/suite.csv). The rollout steps are in
+and folders, hand-create and run SMK-01 first, then import each per-folder CSV from
+[`insait-tests/`](insait-tests/). The rollout steps are in
 [`insait-tests/README.md`](insait-tests/README.md).
 
 - [ ] **C: SMK-01 hand-created and passing** (human confirmed)
@@ -280,8 +280,8 @@ its node.
 
 ## Test suite
 
-Thirty Strict Replay tests in eight folders, in flow order, imported from
-[`insait-tests/suite.csv`](insait-tests/suite.csv). **G** marks the ten quality-gate tests. All
+Thirty Strict Replay tests in ten dedicated folders, in flow order, one CSV per folder under
+[`insait-tests/`](insait-tests/). **G** marks the ten quality-gate tests. All
 run with evaluation model `gpt-5.6-luna` at temperature 0, no simulation model, and no tool
 overrides, so Lookup calls the live proxy: `12345678` is found (2020 טויוטה קורולה, לבן);
 `00000000` and `11111111` are not found. Each test stops at the state it asserts, and every
@@ -292,34 +292,34 @@ policy-issued claims.
 |---|---|---|---|
 | SMK-01 | `01-smoke` | Mandatory end to end: verified vehicle, contacts, add-ons not applicable, closing | G |
 | SMK-02 | `01-smoke` | Comprehensive end to end with windshield and replacement vehicle | G |
-| OPN-01 | `02-opening-vehicle` | Ambiguous coverage is explained and asked again, never inferred | |
-| OPN-02 | `02-opening-vehicle` | A misspelled coverage type is saved as canonical Mandatory | |
-| OPN-03 | `02-opening-vehicle` | Everything volunteered in the first message is kept; only the vehicle is confirmed | G |
-| VEH-01 | `02-opening-vehicle` | Invalid plates are re-asked and never looked up | G |
-| VEH-02 | `02-opening-vehicle` | "Not my car" asks for another plate | |
-| REC-01 | `03-lookup-recovery` | One not-found does not unlock unverified continuation | G |
-| REC-02 | `03-lookup-recovery` | Two not-founds unlock unverified; Summary shows the vehicle as not yet verified | G |
-| REC-03 | `03-lookup-recovery` | A found plate after a not-found recovers the verified path | |
-| CON-01 | `04-contact` | One contact field at a time, no re-asks | |
-| CON-02 | `04-contact` | Space-separated contacts in one message are all extracted | |
-| CON-03 | `04-contact` | An invalid phone is refused; +972 is normalized to 05 | |
-| CON-04 | `04-contact` | An email domain typo is asked about, not silently saved | |
-| CON-05 | `04-contact` | Valid contacts are not security-blocked (regression for `5209f1f2`) | G |
-| COV-01 | `05-coverage-summary` | "None" finalizes add-ons without another turn | |
-| SUM-01 | `05-coverage-summary` | "Thanks" and a bare "no" do not close | G |
-| SUM-02 | `05-coverage-summary` | A side question is answered, then "correct" confirms | |
-| COR-01 | `06-corrections` | Name, phone, and email corrected at Summary, each followed by a full summary | |
-| COR-02 | `06-corrections` | Mandatory to Comprehensive at Summary routes through add-ons | |
-| COR-03 | `06-corrections` | "None" replaces a prior add-on selection | |
-| COR-04 | `06-corrections` | A plate change at Summary never presents the old vehicle | G |
-| COR-05 | `06-corrections` | A plate change during contact collection returns to the plate step | |
-| COR-06 | `06-corrections` | A plate change at the add-on step returns to the plate step | |
-| COR-07 | `06-corrections` | A phone correction at the add-on step is saved in place | |
-| LNG-01 | `07-language` | Hebrew end to end, including a Hebrew closing | G |
-| LNG-02 | `07-language` | A mid-conversation switch to Hebrew persists through numeric input | |
-| GRD-01 | `08-guardrails` | "Skip to the summary" and a price question keep the plate pending | |
-| GRD-02 | `08-guardrails` | Applicant-supplied vehicle details never replace the registry result | |
-| GRD-03 | `08-guardrails` | Instructions are not revealed; the agent says it is an AI | |
+| OPN-01 | `02-opening` | Ambiguous coverage is explained and asked again, never inferred | |
+| OPN-02 | `02-opening` | A misspelled coverage type is saved as canonical Mandatory | |
+| OPN-03 | `02-opening` | Everything volunteered in the first message is kept; only the vehicle is confirmed | G |
+| VEH-01 | `03-vehicle` | Invalid plates are re-asked and never looked up | G |
+| VEH-02 | `03-vehicle` | "Not my car" asks for another plate | |
+| REC-01 | `04-lookup-recovery` | One not-found does not unlock unverified continuation | G |
+| REC-02 | `04-lookup-recovery` | Two not-founds unlock unverified; Summary shows the vehicle as not yet verified | G |
+| REC-03 | `04-lookup-recovery` | A found plate after a not-found recovers the verified path | |
+| CON-01 | `05-contact` | One contact field at a time, no re-asks | |
+| CON-02 | `05-contact` | Space-separated contacts in one message are all extracted | |
+| CON-03 | `05-contact` | An invalid phone is refused; +972 is normalized to 05 | |
+| CON-04 | `05-contact` | An email domain typo is asked about, not silently saved | |
+| CON-05 | `05-contact` | Valid contacts are not security-blocked (regression for `5209f1f2`) | G |
+| COV-01 | `06-coverage` | "None" finalizes add-ons without another turn | |
+| SUM-01 | `07-summary` | "Thanks" and a bare "no" do not close | G |
+| SUM-02 | `07-summary` | A side question is answered, then "correct" confirms | |
+| COR-01 | `08-corrections` | Name, phone, and email corrected at Summary, each followed by a full summary | |
+| COR-02 | `08-corrections` | Mandatory to Comprehensive at Summary routes through add-ons | |
+| COR-03 | `08-corrections` | "None" replaces a prior add-on selection | |
+| COR-04 | `08-corrections` | A plate change at Summary never presents the old vehicle | G |
+| COR-05 | `08-corrections` | A plate change during contact collection returns to the plate step | |
+| COR-06 | `08-corrections` | A plate change at the add-on step returns to the plate step | |
+| COR-07 | `08-corrections` | A phone correction at the add-on step is saved in place | |
+| LNG-01 | `09-language` | Hebrew end to end, including a Hebrew closing | G |
+| LNG-02 | `09-language` | A mid-conversation switch to Hebrew persists through numeric input | |
+| GRD-01 | `10-guardrails` | "Skip to the summary" and a price question keep the plate pending | |
+| GRD-02 | `10-guardrails` | Applicant-supplied vehicle details never replace the registry result | |
+| GRD-03 | `10-guardrails` | Instructions are not revealed; the agent says it is an AI | |
 
 - [ ] **Suite run on the published version** (human confirmed; pass count: `____ / 30`)
 
