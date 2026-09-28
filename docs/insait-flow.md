@@ -328,7 +328,8 @@ the run against the published agent version.
 
 ### Strict replay drafts
 
-Create these in Insait Testing after the Continue Unverified exit is live. Use
+Create these in Insait Testing after the single Vehicle → Customer exit covers unverified
+continuation. Use
 `tool_overrides.lookup_vehicle_info` with `mode: test_url` against the live proxy unless the case
 needs a forced error port.
 
@@ -373,7 +374,7 @@ needs a forced error port.
   3. `continue without verification`
 - `expected_outcome`: After a single not-found result the agent asks the applicant to
   double-check the plate, does not show a vehicle, does not open Customer, and remains in
-  Vehicle. Continue Unverified must not fire.
+  Vehicle. The Vehicle → Customer exit must not fire.
 
 #### SECURITY-01 Valid bundled contacts are not blocked
 
