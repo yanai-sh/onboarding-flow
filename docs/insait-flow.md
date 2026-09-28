@@ -330,10 +330,13 @@ the run against the published agent version.
 
 ### Strict replay drafts
 
-Create these in Insait Testing after the single Vehicle → Customer exit covers unverified
-continuation. Use
-`tool_overrides.lookup_vehicle_info` with `mode: test_url` against the live proxy unless the case
-needs a forced error port.
+CSV import packs (preferred): [`docs/insait-tests/`](insait-tests/) —
+`new-strict-replays.json.csv` / `.wide.csv`, plus per-folder splits and a full
+`all-strict-replays.*.csv` backup of the existing 27.
+
+Create or import these in Insait Testing after the single Vehicle → Customer exit covers
+unverified continuation. Use `tool_overrides.lookup_vehicle_info` with `mode: test_url` against
+the live proxy unless the case needs a forced error port.
 
 #### VEHICLE-05 Second not-found then unverified
 
