@@ -139,9 +139,11 @@ API node, enable a short wait message. Skip if the control is unclear.
 1. After A and B, run all existing 27 strict replays against the published version.
 2. Include at least these in the quality gate: CORE-01…04, VEHICLE-01…02, CORRECTION-06,
    SUMMARY-01…02, INPUT-04.
-3. Create the new strict sets in the section [Strict replay drafts](#strict-replay-drafts)
-   (folder `06-vehicle-recovery-offscript` for VEHICLE-*, `05-corrections-backtracking` for
-   CORRECTION-*, new or `03-contact-validation` for SECURITY-01).
+3. Import the new strict sets from
+   [`docs/insait-tests/new-strict-replays.json.csv`](insait-tests/new-strict-replays.json.csv)
+   (or the matching `.wide.csv` / per-folder files). See
+   [`docs/insait-tests/README.md`](insait-tests/README.md) for column layouts. Draft text also
+   remains in [Strict replay drafts](#strict-replay-drafts).
 4. Paste pass/fail into the Test record checkboxes below; never mark a case done without a run.
 
 - [ ] **C: 27 stricts run; core set in quality gate** (human confirmed; gate result: `________`)
