@@ -27,9 +27,11 @@ name,message_1,…,message_8,expected_outcome,tool_overrides,chunk_1,chunk_2,too
 ```
 
 Each row is one conversation: `name` is the flow name, and `message_1`…`message_8` are the
-applicant turns in order (empty cells are skipped). `tool_overrides`, `chunk_*`,
-`tool_assertions`, `metric_thresholds`, and `session_data` are left empty, so Lookup calls the
-live proxy: `12345678` is found; `00000000` and `11111111` are not found. The CSV has no folder
+applicant turns in order (empty cells are skipped). Every row sets `tool_overrides` to
+`{"lookup_vehicle_info":{"mode":"test_url"}}`, so Lookup calls the tool's configured test URL
+(the live proxy); every Sep 23 lookup test that completed had an override, and runs without one
+stalled. Fixtures: `12345678` is found; `00000000` and `11111111` are not found. `chunk_*`,
+`tool_assertions`, `metric_thresholds`, and `session_data` are left empty. The CSV has no folder
 column; the folder is whichever one you import into.
 
 In the import dialog: flow name column A (`name`), messages B–I (`message_1`…`message_8`),
@@ -49,9 +51,12 @@ stuck even after a rollback. Cancel them and start new runs.
 ## Rollout
 
 1. Delete all existing tests and folders.
-2. Create folder `01-smoke`, import `01-smoke.csv` into it, and run it.
-3. If SMK-01 shows an execution error, the cause is the agent or runner: publish the agent, run
+2. Create folder `00-diagnostic`, import `00-diagnostic.csv`, and run it. DIAG-01 has no lookup
+   (about 3 s on Sep 23); DIAG-02 runs one lookup with the `test_url` override. If DIAG-01 hangs,
+   the runner itself is stuck; if only DIAG-02 hangs, the Lookup path is.
+3. Create folder `01-smoke`, import `01-smoke.csv` into it, and run it.
+4. If SMK-01 shows an execution error, the cause is the agent or runner: publish the agent, run
    one live Test Agent chat, check the Lookup tool URL and the tool schema's `required` field,
    and stop there.
-4. If it passes, create the other nine folders and import each CSV into its own folder.
-5. Add the gate tests above to the quality gate and run.
+5. If it passes, create the other nine folders and import each CSV into its own folder.
+6. Add the gate tests above to the quality gate and run.
