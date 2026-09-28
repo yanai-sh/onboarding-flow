@@ -22,6 +22,13 @@ after eligible failures, but the exit condition ignores that path, so applicants
 Phases A–C below are paste-ready for a human builder. Do not check them off until the change is
 applied and smoke-tested in Insait.
 
+**Known-good baseline: V6** (language update). On Sep 28 a combined edit broke the flow (first
+an exit prompt over the 1000-character limit, then a hang on the first save-and-transition turn),
+and the live agent was rolled back to V6. A live chat on V6 then completed the Mandatory path end
+to end: plate lookup, vehicle confirmation, contacts, summary, and closing. Apply the changes
+below **one at a time** on top of V6, publishing and running a live chat (`Mandatory` →
+`12345678` → `y`) after each, so a regression points to a single change.
+
 ### A. Broaden the single Vehicle → Customer exit (Critical) — pending human apply
 
 On the **Vehicle** conversation node (`conversation-node`):
