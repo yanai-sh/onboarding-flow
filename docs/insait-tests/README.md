@@ -1,67 +1,40 @@
-# Insait strict-replay CSV import packs
+# Insait strict-replay suite
 
-These CSVs are built from the live agent export fields (`name`, `folder_*`,
-`expected_outcome`, `flow_questions`, `tool_overrides`) plus the new Part B drafts
-in [`../insait-flow.md`](../insait-flow.md). Nothing in this repository imports them
-into Insait; a human uploads them in the Testing UI.
+[`suite.csv`](suite.csv) is the full test suite for the live Insait agent: 30 Strict Replay tests
+in 8 folders, 10 of them in the quality gate. The design and per-test intent are in
+[`../insait-flow.md`](../insait-flow.md#test-suite). Nothing in this repository imports it; a
+human uploads it in the Insait Testing UI.
 
-Insait has no public CSV schema, so two layouts are provided. Use whichever matches
-the import dialog; remap columns if the UI template differs.
+## Rules
 
-## Layouts
+- **Strict Replay only.** Each row is a scripted conversation (`flow_questions`). Do not import
+  it as Simulate, and do not set a simulation model on the run.
+- **Evaluation model** `gpt-5.6-luna`, temperature 0.
+- **No tool overrides.** Lookup uses the agent tool's live URL. Fixtures: `12345678` is found
+  (2020 טויוטה קורולה, לבן); `00000000` and `11111111` are not found.
 
-| Suffix | Columns | When to use |
-|---|---|---|
-| `.json.csv` | `flow_questions_json` as a JSON array string | Prefer if the importer accepts one multi-turn field |
-| `.wide.csv` | `user_turn_1` … `user_turn_N` | Prefer if the importer wants one column per user turn |
+## Columns
 
-Shared columns: `name`, `folder_name`, `channel` (`chat`), `quality_gate_mode`
-(`excluded` by default), `expected_outcome`, `tool_overrides_json`, `notes`.
-
-`tool_overrides_json` mirrors the platform shape, e.g.
-`{"lookup_vehicle_info":{"mode":"test_url","status_code":200,"delay_ms":0,"test_url":null}}`.
-Leave empty when the existing test had no override. Set `test_url` in the UI to the
-live proxy if the importer does not accept null.
-
-## Files
-
-| File | Contents |
+| Column | Meaning |
 |---|---|
-| `new-strict-replays.*.csv` | The six new tests (VEHICLE-05/06/07, SECURITY-01, CORRECTION-07/08) |
-| `new-07-unverified-security-backtrack.*.csv` | Same six, all in folder `07-unverified-security-backtrack` |
-| `existing-strict-replays.*.csv` | The current 27 stricts (re-export / backup) |
-| `all-strict-replays.*.csv` | Existing 27 + six new |
+| `name` | Stage id and asserted behavior, e.g. `REC-02 Two not-founds unlock unverified` |
+| `folder_name` | `01-smoke` … `08-guardrails`, in flow order |
+| `expected_outcome` | What the evaluator checks |
+| `flow_questions` | Applicant turns, separated by ` \| ` |
+| `channel` | `chat` |
+| `quality_gate_mode` | `included` for gate tests, otherwise `excluded` |
+| `evaluation_model`, `evaluation_temperature` | `gpt-5.6-luna`, `0` |
 
-## Import order
+If the import dialog uses its own template, map these columns to it. If it wants one column per
+turn, split `flow_questions` on ` | `.
 
-1. Broaden the single Vehicle → Customer exit and publish (see HITL checklist).
-2. Ensure folders exist: `01-input-routing` … `06-vehicle-recovery-offscript`.
-3. Import `new-strict-replays.json.csv` (or the per-folder files).
-4. For **VEHICLE-06**, confirm the Lookup tool override actually forces a technical
-   failure twice; adjust in the UI if needed.
-5. Run the new cases, then decide which to include in the quality gate.
+## Rollout
 
-## Platform constraint
-
-Confirmed and unverified completion share **one** Vehicle → Customer exit. New
-VEHICLE expected outcomes refer to that shared exit, not a second edge.
-
-## If import/run shows "execution error"
-
-Likely causes from the first pack:
-
-1. `tool_overrides` had `"test_url": null` while `mode` was `test_url` — Lookup then has no URL.
-2. Column names did not match the Insait import template, so turns/overrides were empty or invalid.
-3. **VEHICLE-06** forces HTTP 500; some runners treat that as a harness execution error.
-
-Use these fixed files instead (also copied to `~/Downloads`):
-
-| File | Purpose |
-|---|---|
-| `new-strict-replays.minimal.csv` | Simplest: `Name`, `Folder`, `Expected Outcome`, newline-separated `Flow Questions`; **no** tool overrides |
-| `new-strict-replays.fixed.json.csv` | API-shaped fields with a **real** proxy `test_url` |
-| `new-strict-replays.fixed.wide.csv` | `Question 1`…`Question N`; no overrides |
-| `new-strict-replays.no-vehicl06.minimal.csv` | Same as minimal but skips VEHICLE-06 |
-
-Preferred retry order: import `new-strict-replays.minimal.csv` (or the no-VEHICLE-06 variant), map columns in the UI if prompted, then run. Set Lookup test URL in each test to the live proxy only if the importer does not inherit the tool default.
-
+1. Delete all existing tests and folders in Insait.
+2. Create folder `01-smoke` and hand-create `SMK-01 Mandatory end to end` as a Strict Replay
+   (eval model `gpt-5.6-luna`, no simulation model). Run it.
+3. If SMK-01 shows an execution error, the problem is the agent or runner, not this file: publish
+   the agent, warm `https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`, check the Lookup
+   tool URL, and stop there.
+4. If SMK-01 passes, import `suite.csv` (skip the duplicate SMK-01 row or delete the hand-made one).
+5. Run the suite and confirm the 10 gate tests are included in the quality gate.

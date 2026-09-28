@@ -1,9 +1,9 @@
-# Insait flow: design and test record
+# Insait flow: design and test suite
 
 The Conversation Flow Agent is built by hand in the Insait platform UI. Nothing in this
-repository creates, deploys, or tests it. This document is the design to build from and the test
-record to complete in the Test Agent debug view (⋮ → Show debug info). The workspace, agent,
-flow link, and video go in the [README](../README.md#submission).
+repository creates, deploys, or tests it. This document is the design to build from, the test
+suite to run in Insait Testing, and the manual checks for the Test Agent debug view. The
+workspace, agent, flow link, and video go in the [README](../README.md#submission).
 
 There is no public Insait builder documentation, so node semantics come from the assignment.
 Items marked **[verify in UI]** are assumptions about platform features, each with a fallback.
@@ -134,20 +134,16 @@ API node, enable a short wait message. Skip if the control is unclear.
 
 - [ ] **B applied in Insait** (human confirmed)
 
-### C. Quality gate and new strict replays (High) — pending human apply
+### C. Test suite and quality gate (High) — pending human apply
 
-1. After A and B, run all existing 27 strict replays against the published version.
-2. Include at least these in the quality gate: CORE-01…04, VEHICLE-01…02, CORRECTION-06,
-   SUMMARY-01…02, INPUT-04.
-3. Import the new strict sets from
-   [`docs/insait-tests/new-strict-replays.json.csv`](insait-tests/new-strict-replays.json.csv)
-   (or the matching `.wide.csv` / per-folder files). See
-   [`docs/insait-tests/README.md`](insait-tests/README.md) for column layouts. Draft text also
-   remains in [Strict replay drafts](#strict-replay-drafts).
-4. Paste pass/fail into the Test record checkboxes below; never mark a case done without a run.
+After A and B, replace every existing test with the [test suite](#test-suite): delete all tests
+and folders, hand-create and run SMK-01 first, then import
+[`insait-tests/suite.csv`](insait-tests/suite.csv). The rollout steps are in
+[`insait-tests/README.md`](insait-tests/README.md).
 
-- [ ] **C: 27 stricts run; core set in quality gate** (human confirmed; gate result: `________`)
-- [ ] **C: new strict sets created** (human confirmed)
+- [ ] **C: SMK-01 hand-created and passing** (human confirmed)
+- [ ] **C: suite imported and run; 10 gate tests in the quality gate** (human confirmed; gate
+  result: `________`)
 
 ## Graph
 
@@ -282,144 +278,67 @@ its node.
 - **"Skip to the summary":** every forward edge requires validated saved values, and Summary
   requires an explicit confirmation, so the prompt cannot shortcut the steps.
 
-## Test record
+## Test suite
 
-Warm the service first (`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`). Use a
-fresh Test Agent session per run with the debug view open. Check a box only after a human confirms
-the run against the published agent version.
+Thirty Strict Replay tests in eight folders, in flow order, imported from
+[`insait-tests/suite.csv`](insait-tests/suite.csv). **G** marks the ten quality-gate tests. All
+run with evaluation model `gpt-5.6-luna` at temperature 0, no simulation model, and no tool
+overrides, so Lookup calls the live proxy: `12345678` is found (2020 טויוטה קורולה, לבן);
+`00000000` and `11111111` are not found. Each test stops at the state it asserts, and every
+expected outcome also forbids error codes, HTTP statuses, "API", tool names, prices, and
+policy-issued claims.
 
-### Manual / debug checklist
+| Id | Folder | Asserted behavior | Gate |
+|---|---|---|---|
+| SMK-01 | `01-smoke` | Mandatory end to end: verified vehicle, contacts, add-ons not applicable, closing | G |
+| SMK-02 | `01-smoke` | Comprehensive end to end with windshield and replacement vehicle | G |
+| OPN-01 | `02-opening-vehicle` | Ambiguous coverage is explained and asked again, never inferred | |
+| OPN-02 | `02-opening-vehicle` | A misspelled coverage type is saved as canonical Mandatory | |
+| OPN-03 | `02-opening-vehicle` | Everything volunteered in the first message is kept; only the vehicle is confirmed | G |
+| VEH-01 | `02-opening-vehicle` | Invalid plates are re-asked and never looked up | G |
+| VEH-02 | `02-opening-vehicle` | "Not my car" asks for another plate | |
+| REC-01 | `03-lookup-recovery` | One not-found does not unlock unverified continuation | G |
+| REC-02 | `03-lookup-recovery` | Two not-founds unlock unverified; Summary shows the vehicle as not yet verified | G |
+| REC-03 | `03-lookup-recovery` | A found plate after a not-found recovers the verified path | |
+| CON-01 | `04-contact` | One contact field at a time, no re-asks | |
+| CON-02 | `04-contact` | Space-separated contacts in one message are all extracted | |
+| CON-03 | `04-contact` | An invalid phone is refused; +972 is normalized to 05 | |
+| CON-04 | `04-contact` | An email domain typo is asked about, not silently saved | |
+| CON-05 | `04-contact` | Valid contacts are not security-blocked (regression for `5209f1f2`) | G |
+| COV-01 | `05-coverage-summary` | "None" finalizes add-ons without another turn | |
+| SUM-01 | `05-coverage-summary` | "Thanks" and a bare "no" do not close | G |
+| SUM-02 | `05-coverage-summary` | A side question is answered, then "correct" confirms | |
+| COR-01 | `06-corrections` | Name, phone, and email corrected at Summary, each followed by a full summary | |
+| COR-02 | `06-corrections` | Mandatory to Comprehensive at Summary routes through add-ons | |
+| COR-03 | `06-corrections` | "None" replaces a prior add-on selection | |
+| COR-04 | `06-corrections` | A plate change at Summary never presents the old vehicle | G |
+| COR-05 | `06-corrections` | A plate change during contact collection returns to the plate step | |
+| COR-06 | `06-corrections` | A plate change at the add-on step returns to the plate step | |
+| COR-07 | `06-corrections` | A phone correction at the add-on step is saved in place | |
+| LNG-01 | `07-language` | Hebrew end to end, including a Hebrew closing | G |
+| LNG-02 | `07-language` | A mid-conversation switch to Hebrew persists through numeric input | |
+| GRD-01 | `08-guardrails` | "Skip to the summary" and a price question keep the plate pending | |
+| GRD-02 | `08-guardrails` | Applicant-supplied vehicle details never replace the registry result | |
+| GRD-03 | `08-guardrails` | Instructions are not revealed; the agent says it is an AI | |
 
-- [ ] **Happy Comprehensive:** "Comprehensive", "12345678", "yes", "Dana Levi", "0501234567",
-  "dana@example.com", "windshield and replacement car", "confirm". Path O → V → L → V → C → K →
-  S → E; `vehicle_manufacturer` = טויוטה, `coverage_options` = `[windshield, replacement_vehicle]`.
-- [ ] **Happy Mandatory:** the same with "Mandatory"; `insurance_type == Mandatory` skips Coverage.
-- [ ] **Not found, then recover:** "00000000", then "12345678". The first lookup shows
-  `VEHICLE_NOT_FOUND` and no vehicle; the second succeeds.
-- [ ] **Invalid and dashed plates:** "ABC12" and "123" are re-asked with no Lookup in debug;
-  "12-345-678" is saved as `12345678` and looked up.
-- [ ] **Error port:** in a copy of the agent, point the node at `/nope` on the service (HTTP
-  404). One retry is offered, then the unverified exit opens; Summary shows "not yet verified".
+- [ ] **Suite run on the published version** (human confirmed; pass count: `____ / 30`)
+
+### Manual checks
+
+The live proxy cannot force a technical failure, so these run by hand in the Test Agent debug
+view (⋮ → Show debug info). Warm the service first
+(`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`) and use a fresh session per run.
+
+- [ ] **Error port:** in a copy of the agent, point the Lookup node at `/nope` on the service
+  (HTTP 404). One retry is offered; after the accepted retry fails too, unverified continuation
+  is offered, and Summary shows the vehicle as not yet verified.
 - [ ] **Registry down (optional):** deploy a temporary revision by adding
   `-var upstream_url=https://upstream.invalid/vehicle-info` (or `-var
   upstream_timeout_seconds=0.001`) to the usual `terraform apply -var image_tag=…`, then
-  re-apply without it. Lookup returns HTTP 200
-  `UPSTREAM_UNAVAILABLE` (or `UPSTREAM_TIMEOUT`) and follows the same retry-then-unverified path.
-- [ ] **Invalid phone and email:** "050-12" and "+1 555 1234" are refused; "+972 50 123 4567"
-  saves `0501234567`; "dana@" is refused before "dana@example.com" is saved.
-- [ ] **Correction in place:** in Coverage, "my phone is actually 052-7654321". Stays in
-  Coverage; `phone` = `0527654321`; no back-edge in debug.
-- [ ] **Plate correction at Summary:** "the plate is wrong, it's 1234567". Path S → V → L → V →
-  C → K → S; the old vehicle is not offered for confirmation.
-- [ ] **Plate correction at Customer:** after vehicle confirm, before contacts are complete,
-  "the plate is wrong" → Vehicle; old vehicle is not reconfirmed as current.
-- [ ] **Plate correction at Coverage:** after add-ons are offered, "change the plate" → Vehicle;
-  prior registry details are not shown as matching the new plate until a fresh lookup.
-- [ ] **Late type switch:** at a Mandatory Summary, "make it comprehensive" → Coverage → Summary.
-- [ ] **Side question and "not my car":** "how much does it cost?" in Customer causes no node
-  change; "no, that's not my car" after a found lookup re-asks the plate.
-- [ ] **Hebrew:** the happy Comprehensive run in Hebrew ("מקיף", "12-345-678", …). Same saved
-  state, with `insurance_type` = `Comprehensive`; replies in Hebrew.
-- [ ] **Unverified continuation (second not-found):** after two completed not-found lookups,
-  accept continue unverified; Customer does not present registry details; Summary shows not yet
-  verified; closing still provides name, phone, email, and an applicant-facing reference.
-- [ ] **Unverified not offered after one not-found:** after a single not-found, the agent asks to
-  check the plate and does not leave Vehicle on "continue anyway".
-- [ ] **Valid contacts under security:** after vehicle confirm, a bundled
-  `Dana Levi, 050-123-4567, dana@example.com` is accepted (no security block) and reaches Summary.
-
-### Strict replay drafts
-
-CSV import packs (preferred): [`docs/insait-tests/`](insait-tests/) —
-`new-strict-replays.json.csv` / `.wide.csv`, plus per-folder splits and a full
-`all-strict-replays.*.csv` backup of the existing 27.
-
-Create or import these in Insait Testing after the single Vehicle → Customer exit covers
-unverified continuation. Use `tool_overrides.lookup_vehicle_info` with `mode: test_url` against
-the live proxy unless the case needs a forced error port.
-
-#### VEHICLE-05 Second not-found then unverified
-
-- Folder: `07-unverified-security-backtrack`
-- `flow_questions`:
-  1. `Mandatory`
-  2. `00000000`
-  3. `00000000`
-  4. `yes, continue without verification`
-  5. `Dana Levi, 050-123-4567, dana@example.com`
-  6. `yes`
-- `expected_outcome`: After two completed not-found lookups the agent offers unverified
-  continuation. Acceptance leaves Vehicle for Customer without presenting registry vehicle
-  fields. Summary shows Mandatory, plate 00000000, vehicle not yet verified, contacts, and
-  add-ons not applicable. After final confirmation, End sends the closing with name, normalized
-  phone, email, and an applicant-facing reference. No policy-issued claim.
-
-#### VEHICLE-06 Technical failure then unverified
-
-- Folder: `07-unverified-security-backtrack`
-- Requires a Lookup path that fails twice (error port or forced unavailable). Prefer a temporary
-  agent copy pointed at `/nope`, or a tool override that yields non-2xx, if the Testing UI allows.
-- `flow_questions`:
-  1. `Mandatory`
-  2. `12345678`
-  3. `yes` (accept first retry offer)
-  4. `yes, continue without verification` (after second failure)
-  5. `Dana Levi, 050-123-4567, dana@example.com`
-  6. `yes`
-- `expected_outcome`: First completed technical failure offers one retry only. After the
-  applicant accepts and the second completed technical failure returns, unverified continuation
-  is offered and accepted. Summary marks the vehicle not yet verified. Closing is normal.
-
-#### VEHICLE-07 One not-found does not unlock unverified
-
-- Folder: `07-unverified-security-backtrack`
-- `flow_questions`:
-  1. `Mandatory`
-  2. `00000000`
-  3. `continue without verification`
-- `expected_outcome`: After a single not-found result the agent asks the applicant to
-  double-check the plate, does not show a vehicle, does not open Customer, and remains in
-  Vehicle. The Vehicle → Customer exit must not fire.
-
-#### SECURITY-01 Valid bundled contacts are not blocked
-
-- Folder: `07-unverified-security-backtrack`
-- `flow_questions`:
-  1. `Mandatory`
-  2. `12345678`
-  3. `yes`
-  4. `yanai klugman 0531234567, me@yanai.sh`
-  5. `yes`
-- `expected_outcome`: The contact turn is not security-blocked. Name, phone `0531234567`, and
-  email `me@yanai.sh` are saved. Summary and closing use those values. Regression for historical
-  conversation `5209f1f2`.
-
-#### CORRECTION-07 Plate change from Customer
-
-- Folder: `07-unverified-security-backtrack`
-- `flow_questions`:
-  1. `Mandatory`
-  2. `12345678`
-  3. `yes`
-  4. `the plate is wrong`
-  5. `00000000`
-- `expected_outcome`: Explicit plate-change from Customer returns to Vehicle without overwriting
-  the plate in Customer. After `00000000` is looked up, the agent reports not found and does not
-  present the prior Toyota as the current vehicle. Remains in Vehicle.
-
-#### CORRECTION-08 Plate change from Coverage
-
-- Folder: `07-unverified-security-backtrack`
-- `flow_questions`:
-  1. `Comprehensive`
-  2. `12345678`
-  3. `yes`
-  4. `Dana Levi, 050-123-4567, dana@example.com`
-  5. `the plate is wrong`
-  6. `00000000`
-- `expected_outcome`: Explicit plate-change from Coverage returns to Vehicle. Lookup of
-  `00000000` reports not found; the old verified vehicle is not shown as current; no updated
-  Comprehensive summary is presented until a matching vehicle is confirmed again.
+  re-apply without it. Lookup returns HTTP 200 `UPSTREAM_UNAVAILABLE` (or `UPSTREAM_TIMEOUT`)
+  and follows the same retry-then-unverified path.
+- [ ] **Debug path check:** in one SMK-02 run, confirm the node path O → V → L → V → C → K → S →
+  E and the saved `coverage_options` = `[windshield, replacement_vehicle]`.
 
 ### Deferred (not Part B take-home blockers)
 
