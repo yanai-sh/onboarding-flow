@@ -10,6 +10,7 @@ I need to complete these fields before submitting:
 | Insait workspace | `Yanai Klugman Workspace` |
 | Agent | `Encore AI Insurance Onboarding` |
 | Flow link | [Open in Insait](https://platform.gainencore.ai/agent-builder/9cd6b40b-330b-4300-abe0-95f18d43dea4?panel=flow-builder) |
+| Flow export | `encore_ai_insurance_onboarding_2026-09-28.json` (email attachment) |
 | Video (about 3 minutes) | `PENDING — video URL` |
 
 ## Agent UUID
@@ -22,6 +23,7 @@ workspace and agent names above provide a fallback for reviewers who need to loc
 ## Before sending
 
 - [ ] Add the video URL.
+- [ ] Attach the exported flow JSON to the email.
 - [ ] Run `./scripts/check.sh` and confirm CI is green for the submitted commit.
 - [x] Run the configured Insait test suites.
 - [x] Confirm the live service and Swagger links in the
