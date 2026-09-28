@@ -118,6 +118,11 @@ LLM exits. The flow is configured by hand in the Insait UI; nothing in this repo
 or changes it. The design, validation rules, correction handling, and test record are in
 [`docs/insait-flow.md`](docs/insait-flow.md).
 
+Human-in-the-middle apply steps for the live agent (Continue Unverified exit, Customer prompt
+fix, tool schema, quality gate, and new strict-replay drafts) are in the
+[Live gap and HITL apply checklist](docs/insait-flow.md#live-gap-and-hitl-apply-checklist)
+section. Platform checkboxes there stay unchecked until a human confirms each Insait change.
+
 ## Run locally
 
 Requires [uv](https://docs.astral.sh/uv/); uv installs Python 3.14 from `.python-version`.

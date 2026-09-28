@@ -8,6 +8,133 @@ flow link, and video go in the [README](../README.md#submission).
 There is no public Insait builder documentation, so node semantics come from the assignment.
 Items marked **[verify in UI]** are assumptions about platform features, each with a fallback.
 
+Live agent id: `d2c2df93-e514-4b99-a962-243752105fa0` (Encore AI Insurance). Platform actions below
+are marked done only after a human confirms them in Insait.
+
+## Live gap and HITL apply checklist
+
+As of the last full export review, the design includes Vehicle → Customer **Continue Unverified**,
+but the published graph only had **Vehicle Confirmed** as the forward exit from Vehicle. The
+Vehicle prompt already offers unverified continuation after eligible failures; without the exit,
+applicants can get stuck. Phases A–C below are paste-ready for a human builder. Do not check them
+off until the change is applied and smoke-tested in Insait.
+
+### A. Continue Unverified exit (Critical) — pending human apply
+
+On the **Vehicle** conversation node (`conversation-node`):
+
+1. Add an LLM exit named **Continue Unverified** targeting **Customer** (`node-1790108830528`).
+2. Set priority immediately after **Vehicle Confirmed** so confirmation wins when both could match.
+3. Paste this condition prompt:
+
+```text
+Fire only when all of the following are true:
+1. There is no verified match for the current plate: lookup_success is not true, or vehicle_plate does not equal license_plate, or required vehicle fields are empty.
+2. The immediately preceding assistant message offered to continue without registry verification after an eligible failure (second completed VEHICLE_NOT_FOUND, or second completed technical failure after an accepted retry).
+3. The applicant's latest message explicitly accepts that offer.
+
+Do not fire for the first not-found or first technical failure, INVALID_REQUEST, invalid local input, vehicle confirmation, side questions, or mere repetition of the plate.
+When firing, say nothing; Customer explains that an agent will verify the vehicle later.
+```
+
+4. Optional exit `context_message`:
+
+```text
+Unverified continuation for {{license_plate}}. lookup_success is not a verified match. Next: full_name, phone, email — skip any already saved. Do not present vehicle registry details as confirmed.
+```
+
+5. Keep the Vehicle prompt failure rules and the **Vehicle Confirmed** exit unchanged.
+6. Publish the flow.
+
+Smoke (Test Agent + debug), after warming
+`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`:
+
+- [ ] `Mandatory` → `00000000` → not found → second completed not-found → accept continue
+  unverified → contact → Summary shows vehicle not yet verified.
+- [ ] After only one not-found, accepting continue must remain in Vehicle.
+- [ ] Technical path (optional): two completed Lookup failures with an accepted retry between
+  them, then accept unverified.
+
+- [ ] **A applied and smoke-tested in Insait** (human confirmed; record exit id here: `________`)
+
+### B. Customer prompt and tool schema (Low–Medium) — pending human apply
+
+**Customer node prompt:** remove the conflicting language-gate line
+`Do not acknowledge vehicle confirmation; immediately ask only for the next missing contact field.`
+Keep the first-entry rule that briefly acknowledges confirmed vs unverified, then asks one missing
+field. Paste-ready Customer prompt:
+
+```text
+Language gate — apply before every other instruction:
+conversation_language="{{conversation_language}}"
+
+- If conversation_language is "he", output Hebrew only.
+- If conversation_language is "en" or empty, output English only.
+- Numeric input, email, canonical values, and node transitions never change the language.
+
+Current State:
+license_plate="{{license_plate}}"
+lookup_success="{{lookup_success}}"
+vehicle_plate="{{vehicle_plate}}"
+full_name="{{full_name}}"
+phone="{{phone}}"
+email="{{email}}"
+
+Collect full_name, phone, and email.
+
+Accept valid fields in any order and accept several fields in one message. Save each valid field independently and skip fields already saved.
+
+On the first request in this node:
+- If lookup_success is true and vehicle_plate equals license_plate, briefly say the vehicle was confirmed.
+- Otherwise, briefly say that a licensed agent will verify the vehicle later.
+
+Then ask for exactly one missing field at a time:
+
+When full_name is missing:
+- he: מה שמך המלא?
+- en: What is your full name?
+
+When phone is missing:
+- he: מהו מספר הטלפון הנייד הישראלי שבו נשתמש?
+- en: What Israeli mobile number should we use?
+
+When email is missing:
+- he: מהי כתובת האימייל שבה נשתמש?
+- en: What email address should we use?
+
+Apply the global validation and normalization rules.
+
+If a value is invalid, explain the expected form briefly and re-ask only that field.
+
+If the applicant provides several fields and one is invalid, save the valid fields and ask only for the invalid or missing field.
+
+If the applicant explicitly wants to change the plate or vehicle, do not overwrite license_plate. Say nothing and take the plate-change exit.
+
+Once full_name, phone, and email are valid, say nothing; the flow proceeds automatically.
+```
+
+**Encore AI Tools** (`lookup_vehicle_info`): set `function_definition.parameters.required` to
+`["license_plate"]` (not `query`). Keep the `license_plate` property, body template
+`{"license_plate": "{{license_plate}}"}`, and response mappings unchanged.
+
+**Lookup wait feedback [verify in UI]:** if the builder exposes acknowledgements for the Lookup
+API node, enable a short wait message. Skip if the control is unclear.
+
+- [ ] **B applied in Insait** (human confirmed)
+
+### C. Quality gate and new strict replays (High) — pending human apply
+
+1. After A and B, run all existing 27 strict replays against the published version.
+2. Include at least these in the quality gate: CORE-01…04, VEHICLE-01…02, CORRECTION-06,
+   SUMMARY-01…02, INPUT-04.
+3. Create the new strict sets in the section [Strict replay drafts](#strict-replay-drafts)
+   (folder `06-vehicle-recovery-offscript` for VEHICLE-*, `05-corrections-backtracking` for
+   CORRECTION-*, new or `03-contact-validation` for SECURITY-01).
+4. Paste pass/fail into the Test record checkboxes below; never mark a case done without a run.
+
+- [ ] **C: 27 stricts run; core set in quality gate** (human confirmed; gate result: `________`)
+- [ ] **C: new strict sets created** (human confirmed)
+
 ## Graph
 
 Seven nodes: five conversation nodes, one API node, and an end node. **D** marks a
@@ -145,7 +272,10 @@ its node.
 ## Test record
 
 Warm the service first (`curl https://onboarding-flow-2q2x6qga6a-uc.a.run.app/health`). Use a
-fresh Test Agent session per run with the debug view open.
+fresh Test Agent session per run with the debug view open. Check a box only after a human confirms
+the run against the published agent version.
+
+### Manual / debug checklist
 
 - [ ] **Happy Comprehensive:** "Comprehensive", "12345678", "yes", "Dana Levi", "0501234567",
   "dana@example.com", "windshield and replacement car", "confirm". Path O → V → L → V → C → K →
@@ -168,8 +298,113 @@ fresh Test Agent session per run with the debug view open.
   Coverage; `phone` = `0527654321`; no back-edge in debug.
 - [ ] **Plate correction at Summary:** "the plate is wrong, it's 1234567". Path S → V → L → V →
   C → K → S; the old vehicle is not offered for confirmation.
+- [ ] **Plate correction at Customer:** after vehicle confirm, before contacts are complete,
+  "the plate is wrong" → Vehicle; old vehicle is not reconfirmed as current.
+- [ ] **Plate correction at Coverage:** after add-ons are offered, "change the plate" → Vehicle;
+  prior registry details are not shown as matching the new plate until a fresh lookup.
 - [ ] **Late type switch:** at a Mandatory Summary, "make it comprehensive" → Coverage → Summary.
 - [ ] **Side question and "not my car":** "how much does it cost?" in Customer causes no node
   change; "no, that's not my car" after a found lookup re-asks the plate.
 - [ ] **Hebrew:** the happy Comprehensive run in Hebrew ("מקיף", "12-345-678", …). Same saved
   state, with `insurance_type` = `Comprehensive`; replies in Hebrew.
+- [ ] **Unverified continuation (second not-found):** after two completed not-found lookups,
+  accept continue unverified; Customer does not present registry details; Summary shows not yet
+  verified; closing still provides name, phone, email, and an applicant-facing reference.
+- [ ] **Unverified not offered after one not-found:** after a single not-found, the agent asks to
+  check the plate and does not leave Vehicle on "continue anyway".
+- [ ] **Valid contacts under security:** after vehicle confirm, a bundled
+  `Dana Levi, 050-123-4567, dana@example.com` is accepted (no security block) and reaches Summary.
+
+### Strict replay drafts
+
+Create these in Insait Testing after the Continue Unverified exit is live. Use
+`tool_overrides.lookup_vehicle_info` with `mode: test_url` against the live proxy unless the case
+needs a forced error port.
+
+#### VEHICLE-05 Second not-found then unverified
+
+- Folder: `06-vehicle-recovery-offscript`
+- `flow_questions`:
+  1. `Mandatory`
+  2. `00000000`
+  3. `00000000`
+  4. `yes, continue without verification`
+  5. `Dana Levi, 050-123-4567, dana@example.com`
+  6. `yes`
+- `expected_outcome`: After two completed not-found lookups the agent offers unverified
+  continuation. Acceptance leaves Vehicle for Customer without presenting registry vehicle
+  fields. Summary shows Mandatory, plate 00000000, vehicle not yet verified, contacts, and
+  add-ons not applicable. After final confirmation, End sends the closing with name, normalized
+  phone, email, and an applicant-facing reference. No policy-issued claim.
+
+#### VEHICLE-06 Technical failure then unverified
+
+- Folder: `06-vehicle-recovery-offscript`
+- Requires a Lookup path that fails twice (error port or forced unavailable). Prefer a temporary
+  agent copy pointed at `/nope`, or a tool override that yields non-2xx, if the Testing UI allows.
+- `flow_questions`:
+  1. `Mandatory`
+  2. `12345678`
+  3. `yes` (accept first retry offer)
+  4. `yes, continue without verification` (after second failure)
+  5. `Dana Levi, 050-123-4567, dana@example.com`
+  6. `yes`
+- `expected_outcome`: First completed technical failure offers one retry only. After the
+  applicant accepts and the second completed technical failure returns, unverified continuation
+  is offered and accepted. Summary marks the vehicle not yet verified. Closing is normal.
+
+#### VEHICLE-07 One not-found does not unlock unverified
+
+- Folder: `06-vehicle-recovery-offscript`
+- `flow_questions`:
+  1. `Mandatory`
+  2. `00000000`
+  3. `continue without verification`
+- `expected_outcome`: After a single not-found result the agent asks the applicant to
+  double-check the plate, does not show a vehicle, does not open Customer, and remains in
+  Vehicle. Continue Unverified must not fire.
+
+#### SECURITY-01 Valid bundled contacts are not blocked
+
+- Folder: `03-contact-validation`
+- `flow_questions`:
+  1. `Mandatory`
+  2. `12345678`
+  3. `yes`
+  4. `yanai klugman 0531234567, me@yanai.sh`
+  5. `yes`
+- `expected_outcome`: The contact turn is not security-blocked. Name, phone `0531234567`, and
+  email `me@yanai.sh` are saved. Summary and closing use those values. Regression for historical
+  conversation `5209f1f2`.
+
+#### CORRECTION-07 Plate change from Customer
+
+- Folder: `05-corrections-backtracking`
+- `flow_questions`:
+  1. `Mandatory`
+  2. `12345678`
+  3. `yes`
+  4. `the plate is wrong`
+  5. `00000000`
+- `expected_outcome`: Explicit plate-change from Customer returns to Vehicle without overwriting
+  the plate in Customer. After `00000000` is looked up, the agent reports not found and does not
+  present the prior Toyota as the current vehicle. Remains in Vehicle.
+
+#### CORRECTION-08 Plate change from Coverage
+
+- Folder: `05-corrections-backtracking`
+- `flow_questions`:
+  1. `Comprehensive`
+  2. `12345678`
+  3. `yes`
+  4. `Dana Levi, 050-123-4567, dana@example.com`
+  5. `the plate is wrong`
+  6. `00000000`
+- `expected_outcome`: Explicit plate-change from Coverage returns to Vehicle. Lookup of
+  `00000000` reports not found; the old verified vehicle is not shown as current; no updated
+  Comprehensive summary is presented until a matching vehicle is confirmed again.
+
+### Deferred (not Part B take-home blockers)
+
+Domain allowlist, legal disclaimer, retention days, `mask_pii`, fail-open / output-security policy,
+and remapping lookup/vehicle variables away from `source=user` until a spoof reproduction exists.
