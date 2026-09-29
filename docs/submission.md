@@ -1,7 +1,7 @@
 # Submission handoff
 
 I implemented, tested, and deployed the proxy. I also built the Insait agent and ran its 36
-configured platform tests. Only the recording and final email remain.
+configured platform tests. Only the final email remains.
 
 These are the final handoff details:
 
@@ -14,7 +14,7 @@ These are the final handoff details:
 | Agent | `Encore AI Insurance Onboarding` |
 | Flow link | [Open in Insait](https://platform.gainencore.ai/agent-builder/9cd6b40b-330b-4300-abe0-95f18d43dea4?panel=flow-builder) |
 | Flow export | `encore_ai_insurance_onboarding_2026-09-28.json` (email attachment, not committed) |
-| Video (about 3 minutes) | `PENDING — video URL` |
+| Video (about 3 minutes) | `encore_ai_insurance_onboarding_demo.mp4` (email attachment) |
 
 ## Agent UUID
 
@@ -25,7 +25,7 @@ workspace and agent names above provide a fallback for reviewers who need to loc
 
 ## Before sending
 
-- [ ] Publish the video (graph explanation and Comprehensive happy path) and add its URL above.
+- [ ] Attach the video showing the graph explanation and Comprehensive happy path.
 - [ ] Attach the exported flow JSON to the email.
 - [x] Run `./scripts/check.sh` and confirm CI is green for the submitted commit.
 - [x] Run the configured Insait test suites.
