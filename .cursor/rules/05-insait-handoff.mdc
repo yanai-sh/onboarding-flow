@@ -17,7 +17,7 @@ Never imply that repo code or scripts automated the Insait UI.
 
 - Flow shape, node types, and test record: `docs/insait-flow.md` (≤7 nodes
   including End, dedicated API node, no Collect Node).
-- Submission placeholders (workspace, agent, flow link, video): `docs/submission.md`.
+- Submission handoff facts (workspace, agent, flow link, video): `docs/submission.md`.
 - Deploy URL for Insait: Cloud Run via `infra/README.md` after Terraform apply.
 - OpenAPI for integration: `/schema/openapi.json` (Swagger at `/schema/swagger`).
 

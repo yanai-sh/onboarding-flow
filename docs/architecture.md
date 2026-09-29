@@ -93,6 +93,8 @@ The log surface is intentionally small:
 
 ## Code boundaries
 
+All application modules live under `src/onboarding_flow/`.
+
 | Module | Responsibility |
 |---|---|
 | `app.py` | Application composition, lifespan, middleware, and OpenAPI |

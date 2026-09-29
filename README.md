@@ -12,9 +12,9 @@ design and test record. I do not redistribute the assignment PDF here.
 
 ## Reviewer start
 
-- [Submission handoff checklist](docs/submission.md)
 - [Proxy architecture, live service, and design decisions](docs/architecture.md)
 - [Insait flow design and manual test record](docs/insait-flow.md)
+- [Submission links and handoff checklist](docs/submission.md)
 
 ## Quick check
 

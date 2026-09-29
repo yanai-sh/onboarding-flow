@@ -31,7 +31,7 @@ VehicleText = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 
 
 class ErrorCode(StrEnum):
-    """Stable codes for Insait routing on HTTP 200 responses (ADR 0003)."""
+    """Stable codes for Insait routing on HTTP 200 responses."""
 
     INVALID_REQUEST = "INVALID_REQUEST"
     VEHICLE_NOT_FOUND = "VEHICLE_NOT_FOUND"
@@ -42,7 +42,7 @@ class ErrorCode(StrEnum):
 
 class VehicleRequest(BaseModel):
     # Only structural checks here: a plate that breaks the plate rule is a lookup
-    # outcome returned in the envelope, not a framework 4xx (ADR 0003).
+    # outcome returned in the envelope, not a framework 4xx.
     license_plate: str = Field(max_length=MAX_LICENSE_PLATE_INPUT_LENGTH)
 
 

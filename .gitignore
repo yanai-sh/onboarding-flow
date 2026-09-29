@@ -39,6 +39,7 @@ skills-lock.json
 
 # Assignment source (local only)
 docs/FDE_Home_Assignment.pdf
+encore_ai_insurance_onboarding_*.json
 
 # OS & logs
 .DS_Store

@@ -90,7 +90,7 @@ def configure_logging(level: str = "INFO") -> None:
             "loggers": {
                 "_granian": {"handlers": ["stdout"], "level": level, "propagate": False},
                 # httpx logs every request at INFO, including the upstream URL; the
-                # event catalogue in ARCHITECTURE.md is the whole log surface.
+                # The event catalogue in docs/architecture.md is the whole log surface.
                 "httpx": {"level": "WARNING"},
                 "httpcore": {"level": "WARNING"},
             },
